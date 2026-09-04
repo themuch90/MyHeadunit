@@ -22,14 +22,16 @@ services:
     depends_on:
       - mosquitto
 
-  gpsd:
-    image: docker.io/gpsd/gpsd:latest
-    container_name: gpsd
-    restart: unless-stopped
-    network_mode: host
-    devices:
-      - "/dev/ttyUSB0:/dev/ttyUSB0"   # adatta alla porta seriale del tuo modulo GPS
-    command: ["-N", "-n", "/dev/ttyUSB0"]
+  # gpsd disabilitato temporaneamente (nessun modulo GPS collegato in questa
+  # fase di test): riabilita rimuovendo il commento quando serve.
+  # gpsd:
+  #   image: docker.io/gpsd/gpsd:latest
+  #   container_name: gpsd
+  #   restart: unless-stopped
+  #   network_mode: host
+  #   devices:
+  #     - "/dev/ttyUSB0:/dev/ttyUSB0"   # adatta alla porta seriale del tuo modulo GPS
+  #   command: ["-N", "-n", "/dev/ttyUSB0"]
 
   api-gateway:
     build: ./api-gateway
