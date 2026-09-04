@@ -4,7 +4,7 @@
 # del build in produzione: https://github.com/opencardev/openauto
 #                          https://github.com/opencardev/aasdk
 
-FROM debian:bookworm-slim AS builder
+FROM debian:trixie-slim AS builder
 
 RUN apt-get update && apt-get install -y --no-install-recommends \
     build-essential cmake git pkg-config \
@@ -33,12 +33,12 @@ RUN cd openauto && mkdir build && cd build && \
 # virtuale in memoria), e GStreamer (ximagesrc) cattura quello schermo e lo
 # trasmette via TCP in formato grezzo (nessuna codifica H.264: siamo in
 # loopback sulla stessa macchina, comprimere aggiungerebbe solo latenza).
-FROM debian:bookworm-slim
+FROM debian:trixie-slim
 
 RUN apt-get update && apt-get install -y --no-install-recommends \
     qtbase5-dev qtdeclarative5-dev qtmultimedia5-dev libqt5svg5-dev \
     libqt5bluetooth5 \
-    libusb-1.0-0 libboost-system1.74.0 libboost-log1.74.0 \
+    libusb-1.0-0 libboost-system1.83.0 libboost-log1.83.0 \
     xvfb \
     gstreamer1.0-tools \
     gstreamer1.0-plugins-base \
@@ -49,7 +49,7 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
 COPY --from=builder /build/openauto/build/autoapp /usr/local/bin/autoapp
 COPY --from=builder /usr/local/lib/libaasdk* /usr/local/lib/
 
-RUN pip install --no-cache-dir --break-system-packages paho-mqtt
+RUN pip install --no-cache-dir --break-system-packages paho-mqtt==2.1.0
 
 COPY launcher.py /app/launcher.py
 COPY entrypoint.sh /app/entrypoint.sh

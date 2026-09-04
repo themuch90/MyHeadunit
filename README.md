@@ -128,7 +128,7 @@ per debug, ma non è più necessario in condizioni normali.
 
 ### Configurazione ed avvio
 
-Il bridge è ora un servizio Docker Compose come gli altri (vedi `docker-compose.yml`):
+Il bridge è ora un servizio Docker Compose come gli altri (vedi `compose.yaml`):
 
 ```bash
 docker compose build phone-bridge
@@ -318,6 +318,8 @@ fisiche, ma tutto il resto è testabile identico al deploy finale.
   semplicità di sviluppo. In produzione attiva autenticazione/TLS.
 - **Alternative a Cage**: se in futuro serve multi-finestra (es. Android Auto
   proiettato + UI nativa), valuta Weston invece di Cage.
-- **Versioni**: tutte le immagini (`eclipse-mosquitto:2`, `python:3.12-slim`,
-  `node:22-alpine`, `gpsd/gpsd:latest`) sono mantenute attivamente; fissa i tag
-  a versioni specifiche prima di andare in produzione, invece di `latest`.
+- **Versioni**: le immagini sono fissate a versioni specifiche
+  (`eclipse-mosquitto:2.1.2`, `python:3.14-slim`, `debian:trixie-slim`,
+  `node:24-alpine`) invece di tag mobili come `latest`; `gpsd` resta
+  disabilitato per ora (vedi `compose.yaml`) e va ripinnato a un tag preciso
+  quando lo riattivi. Ricontrolla periodicamente gli aggiornamenti a monte.

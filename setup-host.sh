@@ -46,7 +46,7 @@ echo "            VID quando aasdk forza lo switch in modalita' accessory)"
 echo "== Stack telefonia: BlueZ, oFono (HFP), obexd (PBAP rubrica) =="
 echo "   Questi restano demoni di sistema gestiti da systemd (legati a"
 echo "   kernel/hardware Bluetooth); il codice applicativo che li orchestra"
-echo "   (phone-bridge) gira invece in Docker, vedi docker-compose.yml."
+echo "   (phone-bridge) gira invece in Docker, vedi compose.yaml."
 sudo apt-get install -y \
     bluez \
     bluez-obexd \

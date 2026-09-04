@@ -16,7 +16,7 @@ sudo reboot
 3. Avvia lo stack con CAN virtuale invece di hardware:
 
 ```bash
-docker compose -f docker-compose.yml -f vm-testing/docker-compose.override.yml up -d --build
+docker compose -f compose.yaml -f vm-testing/compose.override.yaml up -d --build
 ```
 
 Questo ti dà: Mosquitto, `can-gateway` che legge da `vcan0`, `can-simulator`

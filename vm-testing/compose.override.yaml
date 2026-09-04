@@ -2,7 +2,7 @@
 # invece di can0, e aggiunge il simulatore di traffico.
 #
 # Uso:
-#   docker compose -f docker-compose.yml -f vm-testing/docker-compose.override.yml up -d
+#   docker compose -f compose.yaml -f vm-testing/compose.override.yaml up -d
 #
 # phone-bridge e androidauto-bridge restano nel file principale invariati:
 # partiranno, ma resteranno "in attesa" di hardware Bluetooth/WiFi reale
