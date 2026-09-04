@@ -1,0 +1,90 @@
+version: "3.9"
+
+services:
+  mosquitto:
+    image: eclipse-mosquitto:2
+    container_name: mosquitto
+    restart: unless-stopped
+    ports:
+      - "1883:1883"
+      - "9001:9001"   # websocket, utile se Flutter gira su web/debug remoto
+    volumes:
+      - ./mosquitto/config:/mosquitto/config
+      - mosquitto_data:/mosquitto/data
+      - mosquitto_log:/mosquitto/log
+
+  can-gateway:
+    build: ./can-gateway
+    container_name: can-gateway
+    restart: unless-stopped
+    network_mode: host          # necessario per accedere all'interfaccia can0
+    privileged: true            # richiesto per socketcan
+    depends_on:
+      - mosquitto
+
+  gpsd:
+    image: docker.io/gpsd/gpsd:latest
+    container_name: gpsd
+    restart: unless-stopped
+    network_mode: host
+    devices:
+      - "/dev/ttyUSB0:/dev/ttyUSB0"   # adatta alla porta seriale del tuo modulo GPS
+    command: ["-N", "-n", "/dev/ttyUSB0"]
+
+  api-gateway:
+    build: ./api-gateway
+    container_name: api-gateway
+    restart: unless-stopped
+    network_mode: host
+    environment:
+      - MQTT_HOST=127.0.0.1
+      - MQTT_PORT=1883
+      - HTTP_PORT=8080
+    depends_on:
+      - mosquitto
+
+  phone-bridge:
+    build: ./phone-bridge
+    container_name: phone-bridge
+    restart: unless-stopped
+    network_mode: host    # deve vedere gli stessi processi di rete dell'host (avahi/mdns per alcuni profili)
+    environment:
+      - MQTT_HOST=127.0.0.1
+      - MQTT_PORT=1883
+    volumes:
+      # Canale verso i demoni di sistema: bluetoothd, ofonod, obexd restano
+      # sull'host (sono legati al kernel/hardware), ma il container ci parla
+      # tramite lo stesso bus D-Bus di sistema.
+      - /var/run/dbus:/var/run/dbus
+    depends_on:
+      - mosquitto
+    # bluetoothd/ofonod/obexd devono essere gia' attivi sull'host (systemd),
+    # vedi setup-host.sh. Questo container NON li sostituisce.
+
+  androidauto-bridge:
+    build: ./androidauto-bridge
+    container_name: androidauto-bridge
+    restart: unless-stopped
+    ports:
+      - "127.0.0.1:5000:5000"   # stream video grezzo verso il plugin GStreamer di flutter-pi
+    environment:
+      - MQTT_HOST=host.docker.internal
+      - MQTT_PORT=1883
+      - STREAM_PORT=5000
+      - SCREEN_GEOMETRY=1280x720x24
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
+    volumes:
+      - /dev/bus/usb:/dev/bus/usb   # accesso al telefono collegato via cavo (AOAP)
+    cap_add:
+      - SYS_ADMIN   # aasdk/libusb devono poter riconfigurare l'endpoint USB in modalita' accessory
+    depends_on:
+      - mosquitto
+    # Nessuna dipendenza GPU/VNC/plugin nativo: autoapp disegna su Xvfb,
+    # GStreamer (ximagesrc) cattura lo schermo e lo trasmette via TCP in
+    # formato grezzo. Lato Flutter, flutterpi_gstreamer_video_player
+    # (plugin gia' mantenuto) riceve lo stream e gestisce lui la texture.
+
+volumes:
+  mosquitto_data:
+  mosquitto_log:

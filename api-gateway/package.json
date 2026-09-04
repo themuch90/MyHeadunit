@@ -1,0 +1,11 @@
+{
+  "name": "headunit-api-gateway",
+  "version": "1.0.0",
+  "type": "module",
+  "main": "server.js",
+  "dependencies": {
+    "express": "^4.19.2",
+    "ws": "^8.18.0",
+    "mqtt": "^5.10.1"
+  }
+}

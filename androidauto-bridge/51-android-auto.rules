@@ -1,0 +1,22 @@
+# Regole udev per Android Auto via USB (AOAP - Android Open Accessory Protocol).
+# Il telefono appare inizialmente con il VID del produttore (es. Samsung
+# 04e8, Google 18d1, ecc.), poi aasdk lo riconfigura in modalita' accessory,
+# dove assume VID 18d1 (Google) con PID nel range 2d00-2d05.
+# Questo file da' al container (che gira come utente non-root, se configurato
+# cosi') accesso in lettura/scrittura al device USB in entrambe le fasi.
+#
+# Installazione sull'host:
+#   sudo cp 51-android-auto.rules /etc/udev/rules.d/
+#   sudo udevadm control --reload-rules && sudo udevadm trigger
+
+# Fase 1: telefono collegato in modalita' normale (prima dello switch AOAP).
+# Il gruppo/permessi qui sono volutamente permissivi (0666) perche' il VID
+# esatto del telefono non e' prevedibile in anticipo; se vuoi restringere,
+# aggiungi una riga per il VID specifico del tuo modello.
+SUBSYSTEM=="usb", MODE="0666"
+
+# Fase 2: telefono commutato in modalita' accessory Google (AOAP attivo).
+SUBSYSTEM=="usb", ATTR{idVendor}=="18d1", ATTR{idProduct}=="2d00", MODE="0666"
+SUBSYSTEM=="usb", ATTR{idVendor}=="18d1", ATTR{idProduct}=="2d01", MODE="0666"
+SUBSYSTEM=="usb", ATTR{idVendor}=="18d1", ATTR{idProduct}=="2d04", MODE="0666"
+SUBSYSTEM=="usb", ATTR{idVendor}=="18d1", ATTR{idProduct}=="2d05", MODE="0666"

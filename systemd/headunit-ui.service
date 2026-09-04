@@ -1,0 +1,17 @@
+[Unit]
+Description=Head unit - interfaccia Flutter (kiosk, Cage mono-client)
+After=headunit-docker.service
+Requires=headunit-docker.service
+
+[Service]
+User=headunit
+# Cage torna sufficiente: Android Auto non apre piu' una finestra Wayland
+# separata, il suo video arriva a Flutter via VNC come texture nel widget
+# tree, quindi serve un solo client fullscreen come prima.
+ExecStart=/usr/bin/cage -- /usr/local/bin/flutter-pi --release /opt/headunit/app/build/flutter_assets
+Restart=always
+RestartSec=2
+Environment=XDG_RUNTIME_DIR=/run/user/1000
+
+[Install]
+WantedBy=graphical.target

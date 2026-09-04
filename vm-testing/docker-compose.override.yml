@@ -1,0 +1,25 @@
+# Override per test in VM: sovrascrive can-gateway per puntare a vcan0
+# invece di can0, e aggiunge il simulatore di traffico.
+#
+# Uso:
+#   docker compose -f docker-compose.yml -f vm-testing/docker-compose.override.yml up -d
+#
+# phone-bridge e androidauto-bridge restano nel file principale invariati:
+# partiranno, ma resteranno "in attesa" di hardware Bluetooth/WiFi reale
+# finche' non fai il passthrough di una periferica vera nella VM (vedi
+# setup-vm-host.sh). Se preferisci non farli nemmeno partire durante i test
+# puramente software, commenta i loro servizi o usa:
+#   docker compose ... up -d mosquitto can-gateway can-simulator api-gateway
+
+services:
+  can-gateway:
+    environment:
+      - CAN_CHANNEL=vcan0
+    entrypoint: ["python", "gateway.py"]   # salta la configurazione di can0 reale (ip link/bitrate)
+
+  can-simulator:
+    build: ./vm-testing/can-simulator
+    container_name: can-simulator
+    network_mode: host
+    depends_on:
+      - can-gateway

@@ -1,0 +1,31 @@
+# OS
+.DS_Store
+Thumbs.db
+
+# Editor
+.vscode/
+.idea/
+
+# Flutter / Dart
+flutter_app_stub/.dart_tool/
+flutter_app_stub/.flutter-plugins
+flutter_app_stub/.flutter-plugins-dependencies
+flutter_app_stub/.packages
+flutter_app_stub/build/
+flutter_app_stub/.pub-cache/
+flutter_app_stub/.pub/
+
+# Python
+__pycache__/
+*.pyc
+.venv/
+venv/
+
+# Node
+node_modules/
+
+# Env / secrets
+.env
+.env.*
+*.pem
+*.key
