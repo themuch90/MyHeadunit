@@ -319,7 +319,7 @@ fisiche, ma tutto il resto è testabile identico al deploy finale.
 - **Alternative a Cage**: se in futuro serve multi-finestra (es. Android Auto
   proiettato + UI nativa), valuta Weston invece di Cage.
 - **Versioni**: le immagini sono fissate a versioni specifiche
-  (`eclipse-mosquitto:2.1.2`, `python:3.14-slim`, `debian:trixie-slim`,
+  (`eclipse-mosquitto:2.1.2-alpine`, `python:3.14-slim`, `debian:trixie-slim`,
   `node:24-alpine`) invece di tag mobili come `latest`; `gpsd` resta
   disabilitato per ora (vedi `compose.yaml`) e va ripinnato a un tag preciso
   quando lo riattivi. Ricontrolla periodicamente gli aggiornamenti a monte.
