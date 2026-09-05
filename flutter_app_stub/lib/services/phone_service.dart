@@ -1,6 +1,5 @@
 import 'dart:async';
 import 'dart:convert';
-import 'package:web_socket_channel/web_socket_channel.dart';
 
 /// Stato di una chiamata in corso.
 enum CallState { idle, ringing, dialing, active }
@@ -17,11 +16,11 @@ class Contact {
 }
 
 /// Wrapper sopra il WebSocket condiviso con il resto dell'app (dashboard, ecc.)
-/// dedicato ai topic "car/phone/*". In un'app reale questo canale WS
-/// andrebbe condiviso con un unico client globale invece di aprirne uno per
-/// schermata.
+/// dedicato ai topic "car/phone/*". Riceve il sink per inviare comandi e lo
+/// stream broadcast condiviso (vedi main.dart) per ascoltare i messaggi,
+/// dato che lo stream grezzo di WebSocketChannel supporta un solo listener.
 class PhoneService {
-  final WebSocketChannel _channel;
+  final StreamSink<dynamic> _sink;
   final _callStateController = StreamController<CallState>.broadcast();
   final _incomingCallController =
       StreamController<Map<String, String>>.broadcast();
@@ -32,8 +31,8 @@ class PhoneService {
       _incomingCallController.stream;
   Stream<List<Contact>> get contacts => _contactsController.stream;
 
-  PhoneService(this._channel) {
-    _channel.stream.listen(_onMessage);
+  PhoneService(this._sink, Stream<dynamic> messages) {
+    messages.listen(_onMessage);
   }
 
   void _onMessage(dynamic event) {
@@ -64,7 +63,7 @@ class PhoneService {
   }
 
   void _send(String topic, Map<String, dynamic> payload) {
-    _channel.sink.add(jsonEncode({
+    _sink.add(jsonEncode({
       'topic': topic,
       'payload': jsonEncode(payload),
     }));

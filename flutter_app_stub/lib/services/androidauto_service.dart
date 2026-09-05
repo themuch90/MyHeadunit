@@ -1,6 +1,5 @@
 import 'dart:async';
 import 'dart:convert';
-import 'package:web_socket_channel/web_socket_channel.dart';
 
 enum AndroidAutoState { stopped, starting, active, error }
 
@@ -10,13 +9,13 @@ enum AndroidAutoState { stopped, starting, active, error }
 /// piano quando la sessione diventa attiva: e' un cambio di finestra tra
 /// client separati, non un embedding dentro l'albero widget di Flutter.
 class AndroidAutoService {
-  final WebSocketChannel _channel;
+  final StreamSink<dynamic> _sink;
   final _stateController = StreamController<AndroidAutoState>.broadcast();
 
   Stream<AndroidAutoState> get state => _stateController.stream;
 
-  AndroidAutoService(this._channel) {
-    _channel.stream.listen(_onMessage);
+  AndroidAutoService(this._sink, Stream<dynamic> messages) {
+    messages.listen(_onMessage);
   }
 
   void _onMessage(dynamic event) {
@@ -33,7 +32,7 @@ class AndroidAutoService {
   }
 
   void _send(String topic) {
-    _channel.sink.add(jsonEncode({'topic': topic, 'payload': '{}'}));
+    _sink.add(jsonEncode({'topic': topic, 'payload': '{}'}));
   }
 
   void start() => _send('car/androidauto/cmd/start');

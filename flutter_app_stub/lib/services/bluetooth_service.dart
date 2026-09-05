@@ -1,6 +1,5 @@
 import 'dart:async';
 import 'dart:convert';
-import 'package:web_socket_channel/web_socket_channel.dart';
 
 enum PairingState { idle, pairing, paired, failed }
 
@@ -29,7 +28,7 @@ class BtDevice {
 }
 
 class BluetoothService {
-  final WebSocketChannel _channel;
+  final StreamSink<dynamic> _sink;
 
   final _devicesController = StreamController<List<BtDevice>>.broadcast();
   final _pairingRequestController =
@@ -42,8 +41,8 @@ class BluetoothService {
       _pairingRequestController.stream;
   Stream<PairingState> get pairingState => _pairingStateController.stream;
 
-  BluetoothService(this._channel) {
-    _channel.stream.listen(_onMessage);
+  BluetoothService(this._sink, Stream<dynamic> messages) {
+    messages.listen(_onMessage);
   }
 
   void _onMessage(dynamic event) {
@@ -74,7 +73,7 @@ class BluetoothService {
   }
 
   void _send(String topic, Map<String, dynamic> payload) {
-    _channel.sink.add(jsonEncode({
+    _sink.add(jsonEncode({
       'topic': topic,
       'payload': jsonEncode(payload),
     }));

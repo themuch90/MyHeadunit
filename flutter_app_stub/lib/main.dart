@@ -42,6 +42,11 @@ class _RootScreenState extends State<RootScreen> {
   // Un solo WebSocket condiviso da dashboard e servizio telefono.
   final WebSocketChannel _channel =
       WebSocketChannel.connect(Uri.parse('ws://127.0.0.1:8080/ws'));
+  // Lo stream di WebSocketChannel supporta un solo listener: lo rendiamo
+  // broadcast per poterlo condividere tra dashboard, telefono, bluetooth
+  // e Android Auto, che altrimenti si scontrerebbero con
+  // "Bad state: Stream has already been listened to.".
+  late final Stream<dynamic> _messages = _channel.stream.asBroadcastStream();
   late final PhoneService _phoneService;
   late final BluetoothService _btService;
   late final AndroidAutoService _aaService;
@@ -52,12 +57,12 @@ class _RootScreenState extends State<RootScreen> {
   @override
   void initState() {
     super.initState();
-    _phoneService = PhoneService(_channel);
-    _btService = BluetoothService(_channel);
-    _aaService = AndroidAutoService(_channel);
+    _phoneService = PhoneService(_channel.sink, _messages);
+    _btService = BluetoothService(_channel.sink, _messages);
+    _aaService = AndroidAutoService(_channel.sink, _messages);
 
     // Instrada anche i messaggi CAN (car/can/*) verso la dashboard.
-    _channel.stream.listen((event) {
+    _messages.listen((event) {
       final data = jsonDecode(event as String) as Map<String, dynamic>;
       final topic = data['topic'] as String;
       if (topic.startsWith('car/can/')) {
