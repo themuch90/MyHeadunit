@@ -8,7 +8,8 @@ FROM debian:trixie-slim AS builder
 
 # libabsl-dev: il sottomodulo protobuf vendorizzato da aasdk (v30.0,
 # clonato via --recursive) richiede Abseil per compilare ("Could not find
-# a package configuration file provided by absl").
+# a package configuration file provided by absl"); librtaudio-dev serve a
+# openauto per l'I/O audio ("Could not find rtaudio").
 RUN apt-get update && apt-get install -y --no-install-recommends \
     build-essential cmake git pkg-config \
     qtbase5-dev qtdeclarative5-dev qtmultimedia5-dev libqt5svg5-dev \
@@ -16,6 +17,7 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
     libusb-1.0-0-dev libssl-dev libboost-all-dev \
     protobuf-compiler libprotobuf-dev libabsl-dev \
     libgstreamer1.0-dev libgstreamer-plugins-base1.0-dev \
+    librtaudio-dev \
     ca-certificates \
     && rm -rf /var/lib/apt/lists/*
 
