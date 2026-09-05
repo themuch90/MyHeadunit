@@ -6,11 +6,13 @@ WORKDIR /app
 # gobject-introspection per PyGObject (usato dal GLib.MainLoop); il
 # metapackage "dbus" fornisce dbus-run-session, richiesto dal meson.build
 # di dbus-python per configurare la sua test suite anche se non la
-# eseguiamo mai (su alcune Debian il solo "dbus-bin" non basta).
+# eseguiamo mai (su alcune Debian il solo "dbus-bin" non basta); libcairo2-dev
+# serve a compilare pycairo, dipendenza di build di PyGObject.
 RUN apt-get update && apt-get install -y --no-install-recommends \
     libdbus-1-dev \
     libglib2.0-dev \
     libgirepository1.0-dev \
+    libcairo2-dev \
     dbus \
     gcc \
     pkg-config \
