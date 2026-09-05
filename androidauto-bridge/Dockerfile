@@ -32,8 +32,12 @@ RUN cd aasdk && mkdir build && cd build && \
     cmake -DCMAKE_BUILD_TYPE=Release .. && \
     make -j"$(nproc)" && make install
 
+# -DNOPI=ON: openauto ha il supporto Raspberry Pi (OMX/bcm_host, header
+# specifici del VideoCore) attivo di default; su un target x86_64 come
+# questo va disattivato esplicitamente, altrimenti la build fallisce
+# cercando bcm_host.h.
 RUN cd openauto && mkdir build && cd build && \
-    cmake -DCMAKE_BUILD_TYPE=Release .. && \
+    cmake -DCMAKE_BUILD_TYPE=Release -DNOPI=ON .. && \
     make -j"$(nproc)"
 
 # --- immagine runtime ---------------------------------------------------
