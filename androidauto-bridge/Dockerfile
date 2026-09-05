@@ -58,7 +58,7 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
     python3 python3-pip \
     && rm -rf /var/lib/apt/lists/*
 
-COPY --from=builder /build/openauto/build/autoapp /usr/local/bin/autoapp
+COPY --from=builder /build/openauto/build/bin/autoapp /usr/local/bin/autoapp
 COPY --from=builder /usr/local/lib/libaasdk* /usr/local/lib/
 
 RUN pip install --no-cache-dir --break-system-packages paho-mqtt==2.1.0
