@@ -66,7 +66,8 @@ class _RootScreenState extends State<RootScreen> {
       final data = jsonDecode(event as String) as Map<String, dynamic>;
       final topic = data['topic'] as String;
       if (topic.startsWith('car/can/')) {
-        setState(() => _canSignals[topic.split('/').last] = data['payload'] as String);
+        final payload = jsonDecode(data['payload'] as String) as Map<String, dynamic>;
+        setState(() => _canSignals[topic.split('/').last] = payload['value'].toString());
       }
     });
 
