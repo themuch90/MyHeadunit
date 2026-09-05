@@ -73,6 +73,7 @@ class _RootScreenState extends State<RootScreen> {
     // Ascolto globale: una chiamata in arrivo apre l'overlay sopra qualunque
     // schermata l'utente stia guardando (dashboard, media, mappa...).
     _phoneService.incomingCall.listen((call) {
+      if (!mounted) return;
       Navigator.of(context, rootNavigator: true).push(
         MaterialPageRoute(
           builder: (_) => IncomingCallScreen(
