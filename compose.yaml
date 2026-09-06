@@ -76,6 +76,13 @@ services:
       - "host.docker.internal:host-gateway"
     volumes:
       - /dev/bus/usb:/dev/bus/usb   # accesso al telefono collegato via cavo (AOAP)
+    device_cgroup_rules:
+      # Il bind mount da solo rende visibile il nodo del device, ma il
+      # cgroup di Docker blocca comunque la open() sui device USB (major
+      # 189) senza questa regola: aasdk/libusb la richiede per poter
+      # aprire il device (altrimenti "Devices enumeration result: false"
+      # anche con il telefono collegato e visibile in /dev/bus/usb).
+      - "c 189:* rmw"
     cap_add:
       - SYS_ADMIN   # aasdk/libusb devono poter riconfigurare l'endpoint USB in modalita' accessory
     depends_on:
