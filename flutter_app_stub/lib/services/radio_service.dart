@@ -4,21 +4,32 @@ import 'package:web_socket_channel/web_socket_channel.dart';
 
 enum RadioPlaybackState { stopped, playing, paused }
 
-/// Wrapper sopra l'API WebSocket/JSON-RPC di Mopidy (`ws://host:6680/mopidy/ws`),
-/// che gira come demone di sistema sull'host (non in Docker, vedi
-/// setup-host.sh) esattamente come bluetoothd/ofonod: a differenza del resto
-/// dell'app, questo servizio si collega direttamente a Mopidy, non passa dal
-/// WebSocket condiviso/MQTT dell'api-gateway, perche' Mopidy espone gia' una
-/// API di rete pronta all'uso pensata apposta per questo.
-///
-/// Formato dei messaggi verificato contro un'istanza Mopidy reale (non solo
-/// dalla documentazione, che in alcuni punti e' ambigua/incompleta):
-///   richiesta:  {"jsonrpc": "2.0", "id": N, "method": "...", "params": {...}}
-///   risposta:   {"jsonrpc": "2.0", "id": N, "result": ...}
-///   evento:     {"event": "nome-evento", ...campi specifici dell'evento}
-///     - playback_state_changed: {old_state, new_state}
-///     - stream_title_changed:   {title}
-///     - track_playback_started: {tl_track: {track: {name, genre, uri, ...}}}
+/// Un riferimento nella libreria musicale di Mopidy (cartella, brano,
+/// artista...), come ritornato da `core.library.browse`.
+enum LibraryRefType { directory, track, other }
+
+class LibraryRef {
+  final String uri;
+  final String name;
+  final LibraryRefType type;
+
+  LibraryRef({required this.uri, required this.name, required this.type});
+
+  factory LibraryRef.fromJson(Map<String, dynamic> json) => LibraryRef(
+        uri: json['uri'] as String,
+        name: json['name'] as String? ?? json['uri'] as String,
+        type: switch (json['type']) {
+          'directory' => LibraryRefType.directory,
+          'track' => LibraryRefType.track,
+          _ => LibraryRefType.other,
+        },
+      );
+}
+
+/// Client WebSocket/JSON-RPC verso Mopidy (`ws://host:6680/mopidy/ws`), che
+/// gira sull'host (non in Docker, vedi setup-host.sh). Si collega
+/// direttamente a Mopidy invece che tramite il WebSocket condiviso/MQTT
+/// dell'api-gateway: Mopidy espone gia' un'API di rete pronta all'uso.
 class RadioService {
   final WebSocketChannel _channel;
   int _nextId = 1;
@@ -38,11 +49,9 @@ class RadioService {
       : _channel =
             WebSocketChannel.connect(Uri.parse('ws://$host:$port/mopidy/ws')) {
     _channel.stream.listen(_onMessage, onError: (_) {}, cancelOnError: false);
-    // Mopidy invia eventi solo sui CAMBI di stato, non lo stato corrente al
-    // momento della connessione: senza questo, una stazione gia' in
-    // riproduzione (avviata prima che questa schermata si aprisse, o
-    // sopravvissuta a un riavvio dell'app) risulterebbe "ferma" finche' non
-    // cambia qualcosa.
+    // Mopidy invia eventi solo sui cambi di stato, non lo stato corrente al
+    // momento della connessione: senza questo una riproduzione gia' in corso
+    // risulterebbe "ferma" nell'app finche' non cambia qualcosa.
     _syncInitialState();
   }
 
@@ -133,6 +142,19 @@ class RadioService {
   Future<void> pause() => _call('core.playback.pause');
   Future<void> resume() => _call('core.playback.resume');
   Future<void> stop() => _call('core.playback.stop');
+
+  /// Elenca il contenuto di una cartella della libreria (Spotify, musica
+  /// locale...). uri null = radice (una voce per ogni backend disponibile).
+  Future<List<LibraryRef>> browse(String? uri) async {
+    final result = await _call('core.library.browse', {'uri': uri});
+    return (result as List)
+        .cast<Map<String, dynamic>>()
+        .map(LibraryRef.fromJson)
+        .toList();
+  }
+
+  Future<int?> getVolume() async => (await _call('core.mixer.get_volume')) as int?;
+  Future<void> setVolume(int volume) => _call('core.mixer.set_volume', {'volume': volume});
 
   void dispose() {
     _stateController.close();

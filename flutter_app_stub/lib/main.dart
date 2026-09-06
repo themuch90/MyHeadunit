@@ -5,6 +5,7 @@ import 'services/phone_service.dart';
 import 'services/bluetooth_service.dart';
 import 'services/androidauto_service.dart';
 import 'services/radio_service.dart';
+import 'services/mopidy_config_service.dart';
 import 'widgets/androidauto_texture_view.dart';
 import 'widgets/call_banner.dart';
 import 'screens/dialpad_screen.dart';
@@ -53,6 +54,7 @@ class _RootScreenState extends State<RootScreen> {
   // una API di rete pronta all'uso: RadioService ci si collega direttamente,
   // non tramite il WebSocket condiviso/MQTT come gli altri servizi.
   late final RadioService _radioService;
+  final _mopidyConfigService = MopidyConfigService();
 
   int _tabIndex = 0;
   final Map<String, String> _canSignals = {};
@@ -117,7 +119,11 @@ class _RootScreenState extends State<RootScreen> {
       DialpadScreen(phoneService: _phoneService),
       ContactsScreen(phoneService: _phoneService),
       RadioScreen(radioService: _radioService),
-      SettingsScreen(btService: _btService),
+      SettingsScreen(
+        btService: _btService,
+        radioService: _radioService,
+        mopidyConfigService: _mopidyConfigService,
+      ),
     ];
 
     // Il banner in cima e' mostrato per chiamate in composizione/attive
@@ -152,7 +158,7 @@ class _RootScreenState extends State<RootScreen> {
           NavigationDestination(icon: Icon(Icons.speed), label: 'Cruscotto'),
           NavigationDestination(icon: Icon(Icons.dialpad), label: 'Tastiera'),
           NavigationDestination(icon: Icon(Icons.contacts), label: 'Rubrica'),
-          NavigationDestination(icon: Icon(Icons.radio), label: 'Radio'),
+          NavigationDestination(icon: Icon(Icons.library_music), label: 'Musica'),
           NavigationDestination(icon: Icon(Icons.settings), label: 'Impostazioni'),
         ],
       ),

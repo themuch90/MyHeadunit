@@ -1,15 +1,24 @@
 import 'package:flutter/material.dart';
 import '../services/bluetooth_service.dart';
+import '../services/mopidy_config_service.dart';
+import '../services/radio_service.dart';
 import 'bluetooth_pairing_screen.dart';
+import 'music_settings_screen.dart';
 
 /// Sezione Impostazioni: punto unico per le configurazioni della head unit.
-/// Il pairing Bluetooth (prima una scheda a se stante nella barra di
-/// navigazione) e' ora la prima voce di un menu pensato per crescere -- una
-/// nuova impostazione si aggiunge come ulteriore ListTile qui sotto, senza
-/// toccare la barra di navigazione principale.
+/// Una nuova voce si aggiunge qui come ulteriore ListTile, senza toccare la
+/// barra di navigazione principale.
 class SettingsScreen extends StatelessWidget {
   final BluetoothService btService;
-  const SettingsScreen({super.key, required this.btService});
+  final RadioService radioService;
+  final MopidyConfigService mopidyConfigService;
+
+  const SettingsScreen({
+    super.key,
+    required this.btService,
+    required this.radioService,
+    required this.mopidyConfigService,
+  });
 
   @override
   Widget build(BuildContext context) {
@@ -37,8 +46,24 @@ class SettingsScreen extends StatelessWidget {
             ),
           ),
         ),
-        // Altre voci (es. rete Wi-Fi, luminosita' schermo, info sistema...)
-        // si aggiungono qui come ulteriori _SectionHeader/ListTile.
+        const _SectionHeader('Musica'),
+        ListTile(
+          leading: const Icon(Icons.music_note, color: Colors.white),
+          title: const Text('Musica (Mopidy)', style: TextStyle(color: Colors.white)),
+          subtitle: const Text(
+            'Account Spotify, cartella musica locale, volume',
+            style: TextStyle(color: Colors.grey),
+          ),
+          trailing: const Icon(Icons.chevron_right, color: Colors.grey),
+          onTap: () => Navigator.of(context).push(
+            MaterialPageRoute(
+              builder: (_) => MusicSettingsScreen(
+                configService: mopidyConfigService,
+                radioService: radioService,
+              ),
+            ),
+          ),
+        ),
       ],
     );
   }

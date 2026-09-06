@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import '../services/radio_service.dart';
+import '../widgets/library_browser.dart';
 
 class RadioStation {
   final String name;
@@ -8,9 +9,7 @@ class RadioStation {
   const RadioStation({required this.name, required this.genre, required this.url});
 }
 
-// Stream pubblici SomaFM (icecast, nessuna autenticazione richiesta): un set
-// di preset ragionevole per iniziare. L'utente puo' aggiungerne altri dal
-// campo in fondo alla schermata.
+// Stream pubblici SomaFM: nessuna autenticazione richiesta.
 const _presetStations = [
   RadioStation(
     name: 'Groove Salad',
@@ -58,6 +57,7 @@ class _RadioScreenState extends State<RadioScreen> {
   String? _error;
   String? _trackName;
   String? _streamTitle;
+  int _tab = 0;
 
   @override
   void initState() {
@@ -141,56 +141,75 @@ class _RadioScreenState extends State<RadioScreen> {
             onStop: _stop,
           ),
         ),
-        Expanded(
-          child: ListView.builder(
-            itemCount: stations.length,
-            itemBuilder: (context, i) {
-              final station = stations[i];
-              final selected = _current?.url == station.url;
-              return ListTile(
-                leading: Icon(Icons.radio, color: selected ? Colors.blueAccent : Colors.grey),
-                title: Text(station.name, style: const TextStyle(color: Colors.white)),
-                subtitle: Text(station.genre, style: const TextStyle(color: Colors.grey)),
-                selected: selected,
-                onTap: () => _play(station),
-              );
-            },
+        Padding(
+          padding: const EdgeInsets.symmetric(horizontal: 16),
+          child: SegmentedButton<int>(
+            segments: const [
+              ButtonSegment(value: 0, label: Text('Radio web'), icon: Icon(Icons.radio)),
+              ButtonSegment(value: 1, label: Text('Libreria'), icon: Icon(Icons.library_music)),
+            ],
+            selected: {_tab},
+            onSelectionChanged: (s) => setState(() => _tab = s.first),
           ),
         ),
-        Padding(
-          padding: const EdgeInsets.fromLTRB(16, 0, 16, 16),
-          child: Row(
+        const SizedBox(height: 8),
+        Expanded(
+          child: IndexedStack(
+            index: _tab,
             children: [
-              Expanded(
-                child: TextField(
-                  controller: _nameController,
-                  style: const TextStyle(color: Colors.white),
-                  decoration: const InputDecoration(
-                    hintText: 'Nome stazione',
-                    hintStyle: TextStyle(color: Colors.grey),
-                  ),
-                ),
+              ListView.builder(
+                itemCount: stations.length,
+                itemBuilder: (context, i) {
+                  final station = stations[i];
+                  final selected = _current?.url == station.url;
+                  return ListTile(
+                    leading: Icon(Icons.radio, color: selected ? Colors.blueAccent : Colors.grey),
+                    title: Text(station.name, style: const TextStyle(color: Colors.white)),
+                    subtitle: Text(station.genre, style: const TextStyle(color: Colors.grey)),
+                    selected: selected,
+                    onTap: () => _play(station),
+                  );
+                },
               ),
-              const SizedBox(width: 8),
-              Expanded(
-                flex: 2,
-                child: TextField(
-                  controller: _urlController,
-                  style: const TextStyle(color: Colors.white),
-                  decoration: const InputDecoration(
-                    hintText: 'URL stream (http://...)',
-                    hintStyle: TextStyle(color: Colors.grey),
-                  ),
-                ),
-              ),
-              IconButton(
-                icon: const Icon(Icons.add, color: Colors.blueAccent),
-                tooltip: 'Aggiungi stazione',
-                onPressed: _addCustomStation,
-              ),
+              LibraryBrowser(radioService: widget.radioService),
             ],
           ),
         ),
+        if (_tab == 0)
+          Padding(
+            padding: const EdgeInsets.fromLTRB(16, 8, 16, 16),
+            child: Row(
+              children: [
+                Expanded(
+                  child: TextField(
+                    controller: _nameController,
+                    style: const TextStyle(color: Colors.white),
+                    decoration: const InputDecoration(
+                      hintText: 'Nome stazione',
+                      hintStyle: TextStyle(color: Colors.grey),
+                    ),
+                  ),
+                ),
+                const SizedBox(width: 8),
+                Expanded(
+                  flex: 2,
+                  child: TextField(
+                    controller: _urlController,
+                    style: const TextStyle(color: Colors.white),
+                    decoration: const InputDecoration(
+                      hintText: 'URL stream (http://...)',
+                      hintStyle: TextStyle(color: Colors.grey),
+                    ),
+                  ),
+                ),
+                IconButton(
+                  icon: const Icon(Icons.add, color: Colors.blueAccent),
+                  tooltip: 'Aggiungi stazione',
+                  onPressed: _addCustomStation,
+                ),
+              ],
+            ),
+          ),
       ],
     );
   }

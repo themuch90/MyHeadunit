@@ -93,29 +93,33 @@ UNIT
 sudo systemctl daemon-reload
 sudo systemctl enable --now dbus-session-obex.service obex.service
 
-echo "== Mopidy (motore radio web) =="
+echo "== Mopidy (radio web, musica locale) =="
 echo "   Demone di sistema come bluetoothd/ofonod/obexd sopra, non un"
-echo "   container: ha bisogno di accesso diretto all'hardware audio ALSA,"
-echo "   che un container Docker minimale non riesce a risolvere in modo"
-echo "   affidabile (alsa-lib ha bisogno del database udev dell'host)."
+echo "   container: un container Docker minimale non risolve in modo"
+echo "   affidabile l'hardware audio ALSA (serve il database udev dell'host)."
 echo "   L'app Flutter ci si collega direttamente via WebSocket/JSON-RPC su"
 echo "   127.0.0.1:6680, vedi lib/services/radio_service.dart."
 sudo apt-get install -y \
     mopidy \
+    mopidy-local \
+    mopidy-alsamixer \
+    python3-pip \
     gstreamer1.0-plugins-good \
     gstreamer1.0-plugins-ugly \
     gstreamer1.0-plugins-bad \
     gstreamer1.0-libav \
     glib-networking
 
+# mopidy-local 3.2.1 importa il modulo stdlib "imghdr", rimosso in Python
+# 3.13 (Debian trixie): senza questo shim l'estensione non si carica.
+sudo pip3 install --break-system-packages standard-imghdr
+
 # Bug reale in mopidy 3.4.2 (mopidy/audio/scan.py) con la versione di
-# PyGObject/GStreamer di Debian trixie: nel ramo "have-type" del type-find,
-# legge il MIME type con get_value("caps").get_name(). Ma li' get_value
-# ritorna uno StructureWrapper -- un oggetto pensato per essere usato SOLO
-# come context manager ("with ... as caps:"), che fuori da un blocco with
-# non espone alcun metodo: ogni accesso diretto fallisce con AttributeError.
-# Senza questa patch, core.tracklist.add fallisce silenziosamente su
-# QUALSIASI stream (ritorna una lista vuota invece del brano aggiunto).
+# PyGObject/GStreamer di Debian trixie: get_value("caps").get_name() nel
+# ramo "have-type" del type-find ritorna uno StructureWrapper, utilizzabile
+# solo come context manager ("with ... as caps:"); usato direttamente
+# fallisce sempre con AttributeError, e senza patch core.tracklist.add
+# ritorna silenziosamente una lista vuota su QUALSIASI stream.
 sudo python3 - <<'PYEOF'
 path = "/usr/lib/python3/dist-packages/mopidy/audio/scan.py"
 old = '                mime = msg.get_structure().get_value("caps").get_name()\n'
@@ -132,8 +136,63 @@ if new not in content:
         f.write(content)
 PYEOF
 
+echo "== Cartella musica locale =="
+sudo mkdir -p /var/lib/mopidy/media
+sudo chown mopidy:audio /var/lib/mopidy/media
+
+echo "== Impostazioni Mopidy modificabili dall'app (Spotify, cartella musica) =="
+echo "   Mopidy gira come utente di sistema 'mopidy' e legge la sua config da"
+echo "   piu' file (--config a:b:c, ultimo vince); mopidy.conf resta fisso,"
+echo "   mopidy-user.conf e' quello che la sezione Impostazioni dell'app"
+echo "   legge/scrive (credenziali Spotify, cartella musica locale)."
+sudo groupadd -f mopidy-config
+sudo usermod -aG mopidy-config mopidy
+if id headunit &>/dev/null; then
+  sudo usermod -aG mopidy-config headunit
+fi
+if [ ! -f /etc/mopidy/mopidy-user.conf ]; then
+  cat <<'CONF' | sudo tee /etc/mopidy/mopidy-user.conf > /dev/null
+[local]
+media_dir = /var/lib/mopidy/media
+
+[spotify]
+enabled = false
+client_id =
+client_secret =
+username =
+password =
+CONF
+fi
+# 660, non 664: il file puo' contenere la password Spotify in chiaro.
+sudo chgrp mopidy-config /etc/mopidy/mopidy-user.conf
+sudo chmod 660 /etc/mopidy/mopidy-user.conf
+
+sudo mkdir -p /etc/systemd/system/mopidy.service.d
+cat <<'UNIT' | sudo tee /etc/systemd/system/mopidy.service.d/override.conf > /dev/null
+[Service]
+ExecStart=
+ExecStart=/usr/bin/mopidy --config /usr/share/mopidy/conf.d:/etc/mopidy/mopidy.conf:/etc/mopidy/mopidy-user.conf
+UNIT
+
+# La UI non gira come root: le serve un modo per applicare le modifiche a
+# mopidy-user.conf (riavvio del servizio) e per aggiornare la libreria
+# locale (mopidy_local usa un DB SQLite che va riletto a servizio fermo),
+# senza chiedere una password che su un kiosk touch nessuno digiterebbe.
+if id headunit &>/dev/null; then
+  cat <<'SUDOERS' | sudo tee /etc/sudoers.d/headunit-mopidy > /dev/null
+headunit ALL=(root) NOPASSWD: /usr/bin/systemctl restart mopidy.service, /usr/bin/systemctl stop mopidy.service, /usr/bin/systemctl start mopidy.service
+headunit ALL=(mopidy) NOPASSWD: /usr/bin/mopidy --config /usr/share/mopidy/conf.d:/etc/mopidy/mopidy.conf:/etc/mopidy/mopidy-user.conf local scan
+SUDOERS
+  sudo chmod 440 /etc/sudoers.d/headunit-mopidy
+fi
+
 sudo cp mopidy/mopidy.conf /etc/mopidy/mopidy.conf
-sudo systemctl enable --now mopidy.service
+sudo systemctl daemon-reload
+sudo systemctl enable mopidy.service
+# Scansione iniziale della libreria locale a servizio fermo: mopidy_local
+# scrive un DB SQLite che il servizio in esecuzione tiene aperto.
+sudo -u mopidy mopidy --config /usr/share/mopidy/conf.d:/etc/mopidy/mopidy.conf:/etc/mopidy/mopidy-user.conf local scan
+sudo systemctl start mopidy.service
 
 echo "== Abilita overlay CAN (SOLO Raspberry Pi con HAT SPI, es. MCP2515) =="
 echo "   Su mini PC x86_64 salta questa sezione: usa un adattatore USB-CAN"
