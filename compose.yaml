@@ -62,6 +62,11 @@ services:
       # desktop non esiste di default, quindi setup-host.sh ne crea uno
       # dedicato e persistente apposta per lui (vedi dbus-session-obex.service).
       - /run/dbus-session-obex:/run/dbus-session-obex
+      # obexd scarica i vcard della rubrica in /tmp SULL'HOST (e' un demone
+      # di sistema, gira fuori dal container): senza questo mount il
+      # container vede solo il proprio /tmp isolato e non trova mai il file
+      # il cui percorso arriva da PullAll().
+      - /tmp:/tmp
     depends_on:
       - mosquitto
     # bluetoothd/ofonod/obexd devono essere gia' attivi sull'host (systemd),
