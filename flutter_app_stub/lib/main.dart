@@ -5,6 +5,7 @@ import 'services/phone_service.dart';
 import 'services/bluetooth_service.dart';
 import 'services/androidauto_service.dart';
 import 'widgets/androidauto_texture_view.dart';
+import 'widgets/call_banner.dart';
 import 'screens/dialpad_screen.dart';
 import 'screens/contacts_screen.dart';
 import 'screens/call_screen.dart';
@@ -53,6 +54,8 @@ class _RootScreenState extends State<RootScreen> {
 
   int _tabIndex = 0;
   final Map<String, String> _canSignals = {};
+  CallInfo _call = CallInfo.idle;
+  bool _muted = false;
 
   @override
   void initState() {
@@ -60,6 +63,12 @@ class _RootScreenState extends State<RootScreen> {
     _phoneService = PhoneService(_channel.sink, _messages);
     _btService = BluetoothService(_channel.sink, _messages);
     _aaService = AndroidAutoService(_channel.sink, _messages);
+
+    // Stato di chiamata globale: alimenta il banner in cima mostrato sopra
+    // qualunque scheda (dashboard, rubrica, bluetooth...), non solo sulla
+    // scheda Tastiera che ha gia' la sua vista di chiamata in linea.
+    _phoneService.callState.listen((call) => setState(() => _call = call));
+    _phoneService.muted.listen((m) => setState(() => _muted = m));
 
     // Instrada anche i messaggi CAN (car/can/*) verso la dashboard.
     _messages.listen((event) {
@@ -106,13 +115,31 @@ class _RootScreenState extends State<RootScreen> {
       BluetoothPairingScreen(btService: _btService),
     ];
 
+    // Il banner in cima e' mostrato per chiamate in composizione/attive
+    // (dialing/active) su qualunque scheda; la chiamata in arrivo (ringing)
+    // resta gestita dall'overlay fullscreen dedicato (accetta/rifiuta), che
+    // copre gia' tutto lo schermo.
+    final showCallBanner =
+        _call.state == CallState.dialing || _call.state == CallState.active;
+
     return Scaffold(
-      // IndexedStack invece di screens[_tabIndex]: tiene tutte le schede
-      // montate contemporaneamente (solo quella selezionata e' visibile),
-      // cosi' il loro stato locale (es. lista dispositivi Bluetooth
-      // trovati/accoppiati) sopravvive al cambio scheda invece di essere
-      // ricreato da zero ogni volta.
-      body: SafeArea(child: IndexedStack(index: _tabIndex, children: screens)),
+      body: Column(
+        children: [
+          if (showCallBanner)
+            CallBanner(call: _call, muted: _muted, phoneService: _phoneService),
+          // IndexedStack invece di screens[_tabIndex]: tiene tutte le schede
+          // montate contemporaneamente (solo quella selezionata e' visibile),
+          // cosi' il loro stato locale (es. lista dispositivi Bluetooth
+          // trovati/accoppiati) sopravvive al cambio scheda invece di essere
+          // ricreato da zero ogni volta.
+          Expanded(
+            child: SafeArea(
+              top: !showCallBanner,
+              child: IndexedStack(index: _tabIndex, children: screens),
+            ),
+          ),
+        ],
+      ),
       bottomNavigationBar: NavigationBar(
         selectedIndex: _tabIndex,
         onDestinationSelected: (i) => setState(() => _tabIndex = i),

@@ -16,7 +16,8 @@ Pubblica su MQTT:
   car/bluetooth/pairing/state     idle | pairing | paired | failed
   car/phone/state             connesso/scollegato, nome device
   car/phone/call/incoming     {number, name}
-  car/phone/call/state        idle | ringing | active | dialing
+  car/phone/call/state        {"state": idle|ringing|active|dialing, "number", "name"}
+  car/phone/call/muted        true | false, stato del microfono durante la chiamata
   car/phone/contacts          lista contatti (JSON), pubblicata dopo la sync PBAP
 
 Si sottoscrive a:
@@ -32,7 +33,17 @@ Si sottoscrive a:
   car/phone/cmd/answer
   car/phone/cmd/hangup
   car/phone/cmd/dtmf              {"digit": "5"}
+  car/phone/cmd/mute              {"muted": true}
   car/phone/cmd/sync_contacts
+
+Nota sulla selezione della SIM per le chiamate in uscita: non e' implementata
+perche' il profilo Bluetooth HFP espone un SOLO modem oFono per telefono
+accoppiato (rappresenta l'intero "audio gateway", non le singole SIM); e'
+il telefono a decidere internamente quale SIM usare, senza che questo sia
+esposto via AT command standard. Su un telefono dual-SIM connesso via HFP,
+`GetModems()` ritorna comunque un solo modem (verificato in test con un
+Pixel 7 dual-SIM). Per scegliere la SIM servirebbe un'app companion sul
+telefono stesso: non e' possibile pilotarlo solo dalla head unit via BT.
 """
 
 import json
@@ -347,15 +358,16 @@ def on_call_added(path, properties):
 
     if state == "incoming":
         publish("call/incoming", {"number": number, "name": name})
-        publish("call/state", "ringing")
+        publish("call/state", {"state": "ringing", "number": number, "name": name})
     elif state == "active":
-        publish("call/state", "active")
+        publish("call/state", {"state": "active", "number": number, "name": name})
     elif state == "dialing" or state == "alerting":
-        publish("call/state", "dialing")
+        publish("call/state", {"state": "dialing", "number": number, "name": name})
 
 
 def on_call_removed(path):
-    publish("call/state", "idle")
+    publish("call/state", {"state": "idle", "number": "", "name": ""})
+    publish("call/muted", False)
 
 
 def dial(number: str):
@@ -376,6 +388,20 @@ def hangup():
 
 def send_dtmf(digit: str):
     call_manager().SendTones(digit)
+
+
+def set_mute(muted: bool):
+    # org.ofono.CallVolume e' l'interfaccia oFono dedicata al muto del
+    # microfono durante una chiamata HFP (proprieta' "Muted"): e' un comando
+    # AT reale mandato al telefono, non solo uno stato visuale lato head unit.
+    modem_path = get_ofono_modem()
+    if not modem_path:
+        raise RuntimeError("Nessun modem oFono/HFP disponibile: telefono non accoppiato?")
+    props = dbus.Interface(
+        bus.get_object("org.ofono", modem_path), "org.freedesktop.DBus.Properties"
+    )
+    props.Set("org.ofono.CallVolume", "Muted", dbus.Boolean(muted, variant_level=1))
+    publish("call/muted", muted)
 
 
 # --- BlueZ obexd: sync rubrica via PBAP --------------------------------------
@@ -520,6 +546,8 @@ def on_mqtt_message(client, userdata, msg):
             hangup()
         elif cmd == "dtmf":
             send_dtmf(payload["digit"])
+        elif cmd == "mute":
+            set_mute(bool(payload.get("muted", True)))
         elif cmd == "sync_contacts":
             sync_contacts()
     except Exception as exc:

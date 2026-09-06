@@ -4,6 +4,18 @@ import 'dart:convert';
 /// Stato di una chiamata in corso.
 enum CallState { idle, ringing, dialing, active }
 
+/// Stato completo della chiamata corrente: comune a tutte le UI (tastiera,
+/// banner globale) cosi' che non debbano tenere traccia separatamente di
+/// numero/nome del chiamante.
+class CallInfo {
+  final CallState state;
+  final String number;
+  final String name;
+  const CallInfo({required this.state, this.number = '', this.name = ''});
+
+  static const idle = CallInfo(state: CallState.idle);
+}
+
 class Contact {
   final String name;
   final List<String> numbers;
@@ -21,15 +33,17 @@ class Contact {
 /// dato che lo stream grezzo di WebSocketChannel supporta un solo listener.
 class PhoneService {
   final StreamSink<dynamic> _sink;
-  final _callStateController = StreamController<CallState>.broadcast();
+  final _callStateController = StreamController<CallInfo>.broadcast();
   final _incomingCallController =
       StreamController<Map<String, String>>.broadcast();
   final _contactsController = StreamController<List<Contact>>.broadcast();
+  final _mutedController = StreamController<bool>.broadcast();
 
-  Stream<CallState> get callState => _callStateController.stream;
+  Stream<CallInfo> get callState => _callStateController.stream;
   Stream<Map<String, String>> get incomingCall =>
       _incomingCallController.stream;
   Stream<List<Contact>> get contacts => _contactsController.stream;
+  Stream<bool> get muted => _mutedController.stream;
 
   PhoneService(this._sink, Stream<dynamic> messages) {
     messages.listen(_onMessage);
@@ -41,13 +55,20 @@ class PhoneService {
     final payload = data['payload'] as String;
 
     if (topic == 'car/phone/call/state') {
-      final state = switch (payload.replaceAll('"', '')) {
+      final map = jsonDecode(payload) as Map<String, dynamic>;
+      final state = switch (map['state']) {
         'ringing' => CallState.ringing,
         'dialing' => CallState.dialing,
         'active' => CallState.active,
         _ => CallState.idle,
       };
-      _callStateController.add(state);
+      _callStateController.add(CallInfo(
+        state: state,
+        number: map['number']?.toString() ?? '',
+        name: map['name']?.toString() ?? '',
+      ));
+    } else if (topic == 'car/phone/call/muted') {
+      _mutedController.add(payload == 'true');
     } else if (topic == 'car/phone/call/incoming') {
       final map = jsonDecode(payload) as Map<String, dynamic>;
       _incomingCallController.add({
@@ -73,11 +94,13 @@ class PhoneService {
   void answer() => _send('car/phone/cmd/answer', {});
   void hangup() => _send('car/phone/cmd/hangup', {});
   void sendDtmf(String digit) => _send('car/phone/cmd/dtmf', {'digit': digit});
+  void setMute(bool muted) => _send('car/phone/cmd/mute', {'muted': muted});
   void syncContacts() => _send('car/phone/cmd/sync_contacts', {});
 
   void dispose() {
     _callStateController.close();
     _incomingCallController.close();
     _contactsController.close();
+    _mutedController.close();
   }
 }

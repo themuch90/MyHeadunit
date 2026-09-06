@@ -55,16 +55,12 @@ class IncomingCallScreen extends StatelessWidget {
                     heroTag: 'accept',
                     backgroundColor: Colors.green,
                     onPressed: () {
+                      // Risponde e chiude l'overlay: la chiamata attiva viene
+                      // mostrata dal banner globale in cima e dalla schermata
+                      // Tastiera (vedi main.dart / dialpad_screen.dart), non
+                      // da una route dedicata.
                       phoneService.answer();
-                      Navigator.of(context).pushReplacement(
-                        MaterialPageRoute(
-                          builder: (_) => ActiveCallScreen(
-                            name: name,
-                            number: number,
-                            phoneService: phoneService,
-                          ),
-                        ),
-                      );
+                      Navigator.of(context).pop();
                     },
                     child: const Icon(Icons.call),
                   ),
@@ -78,95 +74,17 @@ class IncomingCallScreen extends StatelessWidget {
   }
 }
 
-/// Schermata durante una chiamata attiva: muto, tastiera DTMF, chiudi.
-class ActiveCallScreen extends StatefulWidget {
-  final String name;
-  final String number;
-  final PhoneService phoneService;
-
-  const ActiveCallScreen({
-    super.key,
-    required this.name,
-    required this.number,
-    required this.phoneService,
-  });
-
-  @override
-  State<ActiveCallScreen> createState() => _ActiveCallScreenState();
-}
-
-class _ActiveCallScreenState extends State<ActiveCallScreen> {
-  bool _muted = false;
-  bool _showKeypad = false;
-
-  @override
-  void initState() {
-    super.initState();
-    widget.phoneService.callState.listen((state) {
-      if (state == CallState.idle && mounted) {
-        Navigator.of(context).pop();
-      }
-    });
-  }
-
-  @override
-  Widget build(BuildContext context) {
-    return Scaffold(
-      backgroundColor: Colors.black,
-      body: SafeArea(
-        child: Column(
-          children: [
-            const SizedBox(height: 48),
-            Text(
-              widget.name.isNotEmpty ? widget.name : widget.number,
-              style: const TextStyle(fontSize: 24, color: Colors.white),
-            ),
-            const SizedBox(height: 4),
-            const Text('In corso', style: TextStyle(color: Colors.greenAccent)),
-            if (_showKeypad) Expanded(child: _MiniDtmfPad(phoneService: widget.phoneService))
-            else const Spacer(),
-            Padding(
-              padding: const EdgeInsets.symmetric(horizontal: 32, vertical: 32),
-              child: Row(
-                mainAxisAlignment: MainAxisAlignment.spaceEvenly,
-                children: [
-                  _CallActionButton(
-                    icon: _muted ? Icons.mic_off : Icons.mic,
-                    label: 'Muto',
-                    active: _muted,
-                    onTap: () => setState(() => _muted = !_muted),
-                    // Nota: il muto reale va implementato lato audio (PulseAudio/
-                    // PipeWire sink del canale SCO), non c'e' un comando oFono
-                    // dedicato: qui e' solo lo stato visuale del pulsante.
-                  ),
-                  FloatingActionButton(
-                    backgroundColor: Colors.red,
-                    onPressed: widget.phoneService.hangup,
-                    child: const Icon(Icons.call_end),
-                  ),
-                  _CallActionButton(
-                    icon: Icons.dialpad,
-                    label: 'Tastiera',
-                    active: _showKeypad,
-                    onTap: () => setState(() => _showKeypad = !_showKeypad),
-                  ),
-                ],
-              ),
-            ),
-          ],
-        ),
-      ),
-    );
-  }
-}
-
-class _CallActionButton extends StatelessWidget {
+/// Bottone rotondo con etichetta usato nei controlli di chiamata attiva
+/// (muto, tastiera DTMF...). Riusato sia dalla schermata Tastiera che dal
+/// banner globale di chiamata.
+class CallActionButton extends StatelessWidget {
   final IconData icon;
   final String label;
   final bool active;
   final VoidCallback onTap;
 
-  const _CallActionButton({
+  const CallActionButton({
+    super.key,
     required this.icon,
     required this.label,
     required this.active,
@@ -189,9 +107,10 @@ class _CallActionButton extends StatelessWidget {
   }
 }
 
-class _MiniDtmfPad extends StatelessWidget {
+/// Tastierino DTMF compatto mostrato durante una chiamata attiva.
+class MiniDtmfPad extends StatelessWidget {
   final PhoneService phoneService;
-  const _MiniDtmfPad({required this.phoneService});
+  const MiniDtmfPad({super.key, required this.phoneService});
 
   @override
   Widget build(BuildContext context) {
