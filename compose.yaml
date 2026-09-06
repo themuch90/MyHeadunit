@@ -51,6 +51,7 @@ services:
     environment:
       - MQTT_HOST=127.0.0.1
       - MQTT_PORT=1883
+      - ADAPTER_ALIAS=Autoradio Smart   # nome mostrato nella lista BT del telefono
     volumes:
       # Canale verso i demoni di sistema: bluetoothd, ofonod, obexd restano
       # sull'host (sono legati al kernel/hardware), ma il container ci parla

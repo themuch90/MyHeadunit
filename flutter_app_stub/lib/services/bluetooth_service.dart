@@ -34,12 +34,16 @@ class BluetoothService {
   final _pairingRequestController =
       StreamController<Map<String, String>>.broadcast();
   final _pairingStateController = StreamController<PairingState>.broadcast();
+  final _discoverableController = StreamController<bool>.broadcast();
 
   Stream<List<BtDevice>> get devices => _devicesController.stream;
   // Emette {device, passkey} quando serve una conferma dall'utente.
   Stream<Map<String, String>> get pairingRequest =>
       _pairingRequestController.stream;
   Stream<PairingState> get pairingState => _pairingStateController.stream;
+  // true quando la head unit e' visibile/associabile dal telefono (dopo
+  // makeDiscoverable()).
+  Stream<bool> get discoverable => _discoverableController.stream;
 
   BluetoothService(this._sink, Stream<dynamic> messages) {
     messages.listen(_onMessage);
@@ -69,6 +73,8 @@ class BluetoothService {
         _ => PairingState.idle,
       };
       _pairingStateController.add(state);
+    } else if (topic == 'car/bluetooth/discoverable') {
+      _discoverableController.add(payload == 'true');
     }
   }
 
@@ -85,10 +91,15 @@ class BluetoothService {
   void remove(String mac) => _send('car/bluetooth/cmd/remove', {'mac': mac});
   void confirmPairing(bool accept) =>
       _send('car/bluetooth/cmd/confirm', {'accept': accept});
+  // Rende la head unit visibile/associabile: usalo per far si' che sia il
+  // telefono a trovare la head unit (come un normale speaker BT), invece
+  // di doverla sempre cercare da qui con startScan().
+  void makeDiscoverable() => _send('car/bluetooth/cmd/make_discoverable', {});
 
   void dispose() {
     _devicesController.close();
     _pairingRequestController.close();
     _pairingStateController.close();
+    _discoverableController.close();
   }
 }

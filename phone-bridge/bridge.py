@@ -20,6 +20,9 @@ Pubblica su MQTT:
   car/phone/contacts          lista contatti (JSON), pubblicata dopo la sync PBAP
 
 Si sottoscrive a:
+  car/bluetooth/cmd/make_discoverable   rende la head unit visibile/associabile
+                                        dal telefono (es. bottone "Associa
+                                        nuovo telefono" nell'app)
   car/bluetooth/cmd/scan_start
   car/bluetooth/cmd/scan_stop
   car/bluetooth/cmd/pair          {"mac": "AA:BB:CC:DD:EE:FF"}
@@ -51,6 +54,7 @@ TOPIC_BASE = "car/phone"
 BT_TOPIC_BASE = "car/bluetooth"
 AGENT_PATH = "/headunit/agent"
 ADAPTER_PATH = "/org/bluez/hci0"  # adatta se il tuo adattatore ha un path diverso
+ADAPTER_ALIAS = os.getenv("ADAPTER_ALIAS", "Autoradio Smart")
 
 dbus.mainloop.glib.DBusGMainLoop(set_as_default=True)
 bus = dbus.SystemBus()
@@ -167,6 +171,31 @@ def on_properties_changed(interface, changed, invalidated, path=None):
 
 def get_adapter():
     return dbus.Interface(bus.get_object("org.bluez", ADAPTER_PATH), "org.bluez.Adapter1")
+
+
+def get_adapter_props():
+    return dbus.Interface(bus.get_object("org.bluez", ADAPTER_PATH), "org.freedesktop.DBus.Properties")
+
+
+def make_discoverable():
+    """
+    Rende la head unit visibile e associabile dal telefono, come un
+    normale speaker/auricolare BT: senza questo, l'adattatore resta
+    "nascosto" e solo la head unit puo' trovare il telefono (via
+    StartDiscovery), mai il contrario. Timeout=0 disabilita lo scadere
+    automatico: la head unit resta sempre visibile, comportamento comune
+    per dispositivi fissi come un'autoradio (a differenza di un telefono,
+    che si rende visibile solo per una finestra di tempo limitata).
+    """
+    props = get_adapter_props()
+    props.Set("org.bluez.Adapter1", "Alias", ADAPTER_ALIAS)
+    props.Set("org.bluez.Adapter1", "DiscoverableTimeout", dbus.UInt32(0))
+    props.Set("org.bluez.Adapter1", "PairableTimeout", dbus.UInt32(0))
+    props.Set("org.bluez.Adapter1", "Discoverable", True)
+    props.Set("org.bluez.Adapter1", "Pairable", True)
+    log.info("Adattatore Bluetooth visibile come '%s' (discoverable+pairable, senza timeout)",
+              ADAPTER_ALIAS)
+    publish("discoverable", True, base=BT_TOPIC_BASE)
 
 
 def start_scan():
@@ -386,7 +415,9 @@ def on_mqtt_message(client, userdata, msg):
 
     try:
         if msg.topic.startswith(BT_TOPIC_BASE):
-            if cmd == "scan_start":
+            if cmd == "make_discoverable":
+                make_discoverable()
+            elif cmd == "scan_start":
                 start_scan()
             elif cmd == "scan_stop":
                 stop_scan()
