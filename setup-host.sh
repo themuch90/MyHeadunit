@@ -116,7 +116,9 @@ sudo apt-get install -y \
     libgstreamer-plugins-bad1.0-dev \
     gstreamer1.0-plugins-base gstreamer1.0-plugins-good \
     gstreamer1.0-plugins-ugly gstreamer1.0-plugins-bad \
-    gstreamer1.0-libav gstreamer1.0-alsa
+    gstreamer1.0-libav gstreamer1.0-alsa \
+    glib-networking   # backend TLS per souphttpsrc: serve alla schermata
+                       # Radio Web per riprodurre stream via https://
 
 git clone --recursive https://github.com/ardera/flutter-pi.git /tmp/flutter-pi
 cd /tmp/flutter-pi

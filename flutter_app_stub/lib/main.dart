@@ -9,7 +9,8 @@ import 'widgets/call_banner.dart';
 import 'screens/dialpad_screen.dart';
 import 'screens/contacts_screen.dart';
 import 'screens/call_screen.dart';
-import 'screens/bluetooth_pairing_screen.dart';
+import 'screens/radio_screen.dart';
+import 'screens/settings_screen.dart';
 
 void main() {
   // Il supporto GStreamer e' integrato in flutter-pi stesso (compilato con
@@ -112,7 +113,8 @@ class _RootScreenState extends State<RootScreen> {
       DashboardTab(signals: _canSignals, aaService: _aaService),
       DialpadScreen(phoneService: _phoneService),
       ContactsScreen(phoneService: _phoneService),
-      BluetoothPairingScreen(btService: _btService),
+      const RadioScreen(),
+      SettingsScreen(btService: _btService),
     ];
 
     // Il banner in cima e' mostrato per chiamate in composizione/attive
@@ -147,7 +149,8 @@ class _RootScreenState extends State<RootScreen> {
           NavigationDestination(icon: Icon(Icons.speed), label: 'Cruscotto'),
           NavigationDestination(icon: Icon(Icons.dialpad), label: 'Tastiera'),
           NavigationDestination(icon: Icon(Icons.contacts), label: 'Rubrica'),
-          NavigationDestination(icon: Icon(Icons.bluetooth), label: 'Bluetooth'),
+          NavigationDestination(icon: Icon(Icons.radio), label: 'Radio'),
+          NavigationDestination(icon: Icon(Icons.settings), label: 'Impostazioni'),
         ],
       ),
     );
