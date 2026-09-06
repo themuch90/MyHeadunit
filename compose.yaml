@@ -72,6 +72,17 @@ services:
     # bluetoothd/ofonod/obexd devono essere gia' attivi sull'host (systemd),
     # vedi setup-host.sh. Questo container NON li sostituisce.
 
+  mopidy:
+    build: ./mopidy
+    container_name: mopidy
+    restart: unless-stopped
+    network_mode: host   # l'app Flutter (sull'host) si collega direttamente a 127.0.0.1:6680
+    volumes:
+      - /dev/snd:/dev/snd   # uscita audio ALSA reale (l'host non ha PulseAudio/PipeWire)
+      - mopidy_data:/var/lib/mopidy
+    group_add:
+      - audio   # accesso ai device /dev/snd, che appartengono al gruppo "audio" dell'host
+
   androidauto-bridge:
     build: ./androidauto-bridge
     container_name: androidauto-bridge
@@ -109,3 +120,4 @@ services:
 volumes:
   mosquitto_data:
   mosquitto_log:
+  mopidy_data:
