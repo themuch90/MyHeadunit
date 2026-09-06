@@ -60,6 +60,41 @@ fi
 
 sudo systemctl enable --now bluetooth.service ofono.service
 
+echo "== Bus di sessione dedicato per obexd (rubrica via PBAP) =="
+echo "   obexd si registra SOLO sul bus di sessione D-Bus, mai su quello"
+echo "   di sistema; su un host headless (nessun utente con sessione"
+echo "   desktop attiva) quel bus non esiste di default, quindi gliene"
+echo "   creiamo uno dedicato e persistente. phone-bridge (in Docker) ci"
+echo "   si connette tramite il socket montato, vedi compose.yaml."
+cat <<'UNIT' | sudo tee /etc/systemd/system/dbus-session-obex.service > /dev/null
+[Unit]
+Description=Bus di sessione D-Bus dedicato a obexd (nessuna sessione desktop su un host headless)
+
+[Service]
+Type=simple
+RuntimeDirectory=dbus-session-obex
+ExecStart=/usr/bin/dbus-daemon --session --address=unix:path=/run/dbus-session-obex/bus --nofork --nopidfile
+
+[Install]
+WantedBy=multi-user.target
+UNIT
+cat <<'UNIT' | sudo tee /etc/systemd/system/obex.service > /dev/null
+[Unit]
+Description=Bluetooth OBEX service (bus di sessione dedicato, host headless)
+After=dbus-session-obex.service
+Requires=dbus-session-obex.service
+
+[Service]
+Type=simple
+Environment=DBUS_SESSION_BUS_ADDRESS=unix:path=/run/dbus-session-obex/bus
+ExecStart=/usr/libexec/bluetooth/obexd -n
+
+[Install]
+WantedBy=multi-user.target
+UNIT
+sudo systemctl daemon-reload
+sudo systemctl enable --now dbus-session-obex.service obex.service
+
 echo "== Abilita overlay CAN (SOLO Raspberry Pi con HAT SPI, es. MCP2515) =="
 echo "   Su mini PC x86_64 salta questa sezione: usa un adattatore USB-CAN"
 echo "   (es. PCAN-USB, CANable) che appare direttamente come can0 via"

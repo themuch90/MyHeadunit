@@ -55,9 +55,27 @@ BT_TOPIC_BASE = "car/bluetooth"
 AGENT_PATH = "/headunit/agent"
 ADAPTER_PATH = "/org/bluez/hci0"  # adatta se il tuo adattatore ha un path diverso
 ADAPTER_ALIAS = os.getenv("ADAPTER_ALIAS", "Autoradio Smart")
+# obexd (PBAP/rubrica) vive solo sul bus di SESSIONE D-Bus, mai su quello
+# di sistema -- su un host headless senza sessione desktop attiva questo
+# bus non esiste di default, quindi setup-host.sh ne crea uno dedicato e
+# persistente apposta per lui (vedi dbus-session-obex.service).
+OBEX_SESSION_BUS_ADDRESS = os.getenv(
+    "OBEX_SESSION_BUS_ADDRESS", "unix:path=/run/dbus-session-obex/bus"
+)
 
 dbus.mainloop.glib.DBusGMainLoop(set_as_default=True)
 bus = dbus.SystemBus()
+_obex_bus = None
+
+
+def get_obex_bus():
+    # Connessione creata al primo utilizzo (non all'avvio): se il socket
+    # del bus di sessione dedicato a obexd non fosse ancora pronto, non
+    # deve far crashare l'intero bridge, solo la sync rubrica che lo usa.
+    global _obex_bus
+    if _obex_bus is None:
+        _obex_bus = dbus.bus.BusConnection(OBEX_SESSION_BUS_ADDRESS)
+    return _obex_bus
 
 mqttc = mqtt.Client(mqtt.CallbackAPIVersion.VERSION2, client_id="phone-bridge")
 
@@ -358,15 +376,16 @@ def sync_contacts():
             publish("error", {"cmd": "sync_contacts", "message": "Nessun telefono connesso"})
             return
 
+        obex_bus = get_obex_bus()
         client = dbus.Interface(
-            bus.get_object("org.bluez.obex", "/org/bluez/obex"),
+            obex_bus.get_object("org.bluez.obex", "/org/bluez/obex"),
             "org.bluez.obex.Client1",
         )
         session_path = client.CreateSession(
             device_mac, {"Target": "PBAP"}
         )
         pbap = dbus.Interface(
-            bus.get_object("org.bluez.obex", session_path),
+            obex_bus.get_object("org.bluez.obex", session_path),
             "org.bluez.obex.PhonebookAccess1",
         )
         pbap.Select("int", "pb")  # rubrica del telefono interno

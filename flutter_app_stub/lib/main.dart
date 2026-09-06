@@ -107,7 +107,12 @@ class _RootScreenState extends State<RootScreen> {
     ];
 
     return Scaffold(
-      body: SafeArea(child: screens[_tabIndex]),
+      // IndexedStack invece di screens[_tabIndex]: tiene tutte le schede
+      // montate contemporaneamente (solo quella selezionata e' visibile),
+      // cosi' il loro stato locale (es. lista dispositivi Bluetooth
+      // trovati/accoppiati) sopravvive al cambio scheda invece di essere
+      // ricreato da zero ogni volta.
+      body: SafeArea(child: IndexedStack(index: _tabIndex, children: screens)),
       bottomNavigationBar: NavigationBar(
         selectedIndex: _tabIndex,
         onDestinationSelected: (i) => setState(() => _tabIndex = i),

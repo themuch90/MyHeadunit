@@ -53,10 +53,15 @@ services:
       - MQTT_PORT=1883
       - ADAPTER_ALIAS=Autoradio Smart   # nome mostrato nella lista BT del telefono
     volumes:
-      # Canale verso i demoni di sistema: bluetoothd, ofonod, obexd restano
+      # Canale verso i demoni di sistema: bluetoothd, ofonod restano
       # sull'host (sono legati al kernel/hardware), ma il container ci parla
       # tramite lo stesso bus D-Bus di sistema.
       - /var/run/dbus:/var/run/dbus
+      # obexd (PBAP/rubrica) e' registrato solo sul bus di SESSIONE D-Bus,
+      # mai su quello di sistema: su un host headless senza sessione
+      # desktop non esiste di default, quindi setup-host.sh ne crea uno
+      # dedicato e persistente apposta per lui (vedi dbus-session-obex.service).
+      - /run/dbus-session-obex:/run/dbus-session-obex
     depends_on:
       - mosquitto
     # bluetoothd/ofonod/obexd devono essere gia' attivi sull'host (systemd),

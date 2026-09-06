@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import '../services/phone_service.dart';
+import 'call_screen.dart';
 
 class DialpadScreen extends StatefulWidget {
   final PhoneService phoneService;
@@ -20,8 +21,11 @@ class _DialpadScreenState extends State<DialpadScreen> {
   ];
 
   void _onKeyTap(String digit) {
+    // Solo composizione locale: il DTMF va inviato esclusivamente durante
+    // una chiamata attiva (vedi _MiniDtmfPad in call_screen.dart), non
+    // mentre si sta ancora scrivendo il numero da chiamare -- inviarlo qui
+    // faceva partire la chiamata ad ogni cifra digitata.
     setState(() => _number += digit);
-    widget.phoneService.sendDtmf(digit);
   }
 
   void _onBackspace() {
@@ -32,6 +36,15 @@ class _DialpadScreenState extends State<DialpadScreen> {
   void _onCall() {
     if (_number.isEmpty) return;
     widget.phoneService.dial(_number);
+    Navigator.of(context).push(
+      MaterialPageRoute(
+        builder: (_) => ActiveCallScreen(
+          name: '',
+          number: _number,
+          phoneService: widget.phoneService,
+        ),
+      ),
+    );
   }
 
   @override
