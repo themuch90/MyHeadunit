@@ -279,6 +279,23 @@ def remove_device(mac: str):
     _publish_devices()
 
 
+def load_known_devices():
+    """
+    Popola _known_devices con lo stato ATTUALE all'avvio del bridge (es.
+    dopo un restart del container mentre il telefono e' gia' accoppiato e
+    connesso): senza questo, il bridge non sa nulla dei device finche' non
+    arriva un futuro segnale InterfacesAdded/PropertiesChanged, quindi sia
+    la UI (lista Bluetooth vuota) sia sync_contacts ("nessun telefono
+    connesso") si comportano come se non ci fosse alcun dispositivo,
+    anche quando in realta' e' gia' connesso a livello BlueZ.
+    """
+    manager = dbus.Interface(
+        bus.get_object("org.bluez", "/"), "org.freedesktop.DBus.ObjectManager"
+    )
+    for path, interfaces in manager.GetManagedObjects().items():
+        on_interfaces_added(path, interfaces)
+
+
 def watch_bluez_signals():
     bus.add_signal_receiver(
         on_interfaces_added,
@@ -495,6 +512,7 @@ def main():
     mqttc.loop_start()
 
     register_agent()
+    load_known_devices()
     watch_bluez_signals()
     watch_ofono_signals()
 
