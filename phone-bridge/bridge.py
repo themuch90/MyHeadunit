@@ -103,6 +103,17 @@ class PairingAgent(dbus.service.Object):
         log.info("Autorizzazione pairing 'Just Works' per %s", device)
         return
 
+    @dbus.service.method("org.bluez.Agent1", in_signature="os", out_signature="")
+    def AuthorizeService(self, device, uuid):
+        # BlueZ chiama questo ogni volta che il telefono prova a connettere
+        # un profilo (es. HFP Hands-Free, A2DP) verso un device gia'
+        # accoppiato: senza un'implementazione, bluetoothd riceve
+        # "UnknownMethod" e rifiuta la connessione del servizio, causando
+        # un ciclo di connessione/disconnessione continuo lato telefono
+        # (il device resta "paired" ma non riesce mai a restare connesso).
+        log.info("Autorizzazione servizio %s per %s", uuid, device)
+        return
+
     @dbus.service.method("org.bluez.Agent1", in_signature="", out_signature="")
     def Cancel(self):
         log.info("Pairing annullato da BlueZ")
@@ -187,12 +198,17 @@ def make_discoverable():
     per dispositivi fissi come un'autoradio (a differenza di un telefono,
     che si rende visibile solo per una finestra di tempo limitata).
     """
+    # variant_level=1 e' necessario perche' Properties.Set ha firma "ssv":
+    # senza incapsulare esplicitamente il valore come Variant, dbus-python
+    # a volte lo marshalla come tipo semplice (es. "sss" invece di "ssv")
+    # a seconda che l'introspezione dell'interfaccia sia gia' in cache,
+    # causando un errore intermittente "Method Set ... doesn't exist".
     props = get_adapter_props()
-    props.Set("org.bluez.Adapter1", "Alias", ADAPTER_ALIAS)
-    props.Set("org.bluez.Adapter1", "DiscoverableTimeout", dbus.UInt32(0))
-    props.Set("org.bluez.Adapter1", "PairableTimeout", dbus.UInt32(0))
-    props.Set("org.bluez.Adapter1", "Discoverable", True)
-    props.Set("org.bluez.Adapter1", "Pairable", True)
+    props.Set("org.bluez.Adapter1", "Alias", dbus.String(ADAPTER_ALIAS, variant_level=1))
+    props.Set("org.bluez.Adapter1", "DiscoverableTimeout", dbus.UInt32(0, variant_level=1))
+    props.Set("org.bluez.Adapter1", "PairableTimeout", dbus.UInt32(0, variant_level=1))
+    props.Set("org.bluez.Adapter1", "Discoverable", dbus.Boolean(True, variant_level=1))
+    props.Set("org.bluez.Adapter1", "Pairable", dbus.Boolean(True, variant_level=1))
     log.info("Adattatore Bluetooth visibile come '%s' (discoverable+pairable, senza timeout)",
               ADAPTER_ALIAS)
     publish("discoverable", True, base=BT_TOPIC_BASE)
