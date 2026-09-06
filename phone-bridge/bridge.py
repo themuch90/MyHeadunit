@@ -38,6 +38,7 @@ Si sottoscrive a:
 import json
 import logging
 import os
+import time
 
 import dbus
 import dbus.mainloop.glib
@@ -407,16 +408,42 @@ def sync_contacts():
         )
         pbap.Select("int", "pb")  # rubrica del telefono interno
         # PullAll scarica il vcard completo; in produzione preferisci Search/List
-        # con paginazione per rubriche grandi.
-        vcard_path, _transfer_props = pbap.PullAll("", {"Format": "vcard30"})
+        # con paginazione per rubriche grandi. Ritorna subito l'object path
+        # del Transfer1 (il download OBEX e' asincrono), NON il percorso del
+        # file: va atteso il completamento prima di poterlo leggere.
+        transfer_path, _transfer_props = pbap.PullAll("", {"Format": "vcard30"})
+        vcard_path = _wait_for_transfer_complete(obex_bus, transfer_path)
 
         contacts = _parse_vcard_file(vcard_path)
         publish("contacts", contacts)
 
         client.RemoveSession(session_path)
-    except dbus.exceptions.DBusException as exc:
+    except (dbus.exceptions.DBusException, RuntimeError, TimeoutError) as exc:
         log.error("Sync rubrica fallita: %s", exc)
         publish("error", {"cmd": "sync_contacts", "message": str(exc)})
+
+
+def _wait_for_transfer_complete(obex_bus, transfer_path, timeout=15):
+    """
+    Attende che un trasferimento OBEX (avviato da PullAll) raggiunga lo
+    stato "complete", poi ritorna il percorso locale del file scaricato
+    (proprieta' Filename del Transfer1). Il trasferimento e' asincrono:
+    leggere subito Filename dopo PullAll() puo' dare un file inesistente
+    o incompleto se il download e' ancora in corso.
+    """
+    props = dbus.Interface(
+        obex_bus.get_object("org.bluez.obex", transfer_path),
+        "org.freedesktop.DBus.Properties",
+    )
+    deadline = time.monotonic() + timeout
+    while time.monotonic() < deadline:
+        status = str(props.Get("org.bluez.obex.Transfer1", "Status"))
+        if status == "complete":
+            return str(props.Get("org.bluez.obex.Transfer1", "Filename"))
+        if status == "error":
+            raise RuntimeError(f"Trasferimento OBEX fallito ({transfer_path})")
+        time.sleep(0.2)
+    raise TimeoutError(f"Trasferimento OBEX non completato entro {timeout}s ({transfer_path})")
 
 
 def _first_connected_device_mac():
