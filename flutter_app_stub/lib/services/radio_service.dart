@@ -15,7 +15,7 @@ enum RadioPlaybackState { stopped, playing, paused }
 /// dalla documentazione, che in alcuni punti e' ambigua/incompleta):
 ///   richiesta:  {"jsonrpc": "2.0", "id": N, "method": "...", "params": {...}}
 ///   risposta:   {"jsonrpc": "2.0", "id": N, "result": ...}
-///   evento:     {"event": "<nome>", ...campi specifici dell'evento}
+///   evento:     {"event": "nome-evento", ...campi specifici dell'evento}
 ///     - playback_state_changed: {old_state, new_state}
 ///     - stream_title_changed:   {title}
 ///     - track_playback_started: {tl_track: {track: {name, genre, uri, ...}}}
