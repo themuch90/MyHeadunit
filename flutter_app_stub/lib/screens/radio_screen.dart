@@ -219,6 +219,11 @@ class _NowPlayingCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    // Attivo quando qualcosa sta suonando o e' in pausa, non solo quando la
+    // riproduzione e' partita da questa schermata: lo stato reale arriva
+    // sempre da Mopidy (vedi RadioService), che potrebbe gia' avere una
+    // stazione in corso indipendentemente da come e' stata avviata.
+    final isActive = playback != RadioPlaybackState.stopped;
     final isPlaying = playback == RadioPlaybackState.playing;
     final title = trackName ?? current?.name ?? 'Nessuna stazione';
     final subtitle = error ??
@@ -232,7 +237,7 @@ class _NowPlayingCard extends StatelessWidget {
         padding: const EdgeInsets.all(16.0),
         child: Row(
           children: [
-            Icon(Icons.radio, color: current != null ? Colors.blueAccent : Colors.grey, size: 32),
+            Icon(Icons.radio, color: isActive ? Colors.blueAccent : Colors.grey, size: 32),
             const SizedBox(width: 16),
             Expanded(
               child: Column(
@@ -254,7 +259,7 @@ class _NowPlayingCard extends StatelessWidget {
                 width: 24, height: 24,
                 child: CircularProgressIndicator(strokeWidth: 2),
               )
-            else if (current != null) ...[
+            else if (isActive) ...[
               IconButton(
                 iconSize: 32,
                 color: Colors.white,
