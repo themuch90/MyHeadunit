@@ -47,10 +47,15 @@ RUN cd openauto && mkdir build && cd build && \
 # loopback sulla stessa macchina, comprimere aggiungerebbe solo latenza).
 FROM debian:trixie-slim
 
+# librtaudio7, libgps30, libprotobuf32: librerie runtime per l'I/O audio,
+# GPS e protobuf che autoapp/libaasdk usano -- il builder installa solo
+# le "-dev" (necessarie per compilare/linkare), ma l'immagine finale le
+# perdeva a runtime ("error while loading shared libraries").
 RUN apt-get update && apt-get install -y --no-install-recommends \
     qtbase5-dev qtdeclarative5-dev qtmultimedia5-dev libqt5svg5-dev \
     libqt5bluetooth5 \
     libusb-1.0-0 libboost-system1.83.0 libboost-log1.83.0 \
+    librtaudio7 libgps30 libprotobuf32 \
     xvfb \
     gstreamer1.0-tools \
     gstreamer1.0-plugins-base \
@@ -60,6 +65,7 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
 
 COPY --from=builder /build/openauto/build/bin/autoapp /usr/local/bin/autoapp
 COPY --from=builder /usr/local/lib/libaasdk* /usr/local/lib/
+COPY --from=builder /usr/local/lib/libaap_protobuf* /usr/local/lib/
 
 RUN pip install --no-cache-dir --break-system-packages paho-mqtt==2.1.0
 
