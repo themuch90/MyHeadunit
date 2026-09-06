@@ -31,7 +31,7 @@ docker exec -it mosquitto mosquitto_sub -t 'car/#' -v
 ```
 
 5. Compila e avvia l'app Flutter dentro la VM (stessa procedura del README
-   principale, `flutter build linux --release` + `flutter-pi` sotto Cage) —
+   principale: `flutter build linux --release`, poi il bundle sotto Cage) —
    il dashboard mostrerà i valori generati da `can-simulator`.
 
 ## Cosa stai validando in questo modo

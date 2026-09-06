@@ -13,10 +13,6 @@ import 'screens/radio_screen.dart';
 import 'screens/settings_screen.dart';
 
 void main() {
-  // Il supporto GStreamer e' integrato in flutter-pi stesso (compilato con
-  // BUILD_GSTREAMER_VIDEO_PLAYER_PLUGIN=ON, vedi setup-host.sh): non
-  // serve alcuna registrazione esplicita lato Dart, si usa direttamente il
-  // pacchetto ufficiale video_player.
   runApp(const HeadUnitApp());
 }
 

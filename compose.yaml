@@ -77,7 +77,7 @@ services:
     container_name: androidauto-bridge
     restart: unless-stopped
     ports:
-      - "127.0.0.1:5000:5000"   # stream video grezzo verso il plugin GStreamer di flutter-pi
+      - "127.0.0.1:5000:5000"   # stream video grezzo (GStreamer raw su TCP) verso l'app Flutter
     environment:
       - MQTT_HOST=host.docker.internal
       - MQTT_PORT=1883
@@ -98,10 +98,13 @@ services:
       - SYS_ADMIN   # aasdk/libusb devono poter riconfigurare l'endpoint USB in modalita' accessory
     depends_on:
       - mosquitto
-    # Nessuna dipendenza GPU/VNC/plugin nativo: autoapp disegna su Xvfb,
+    # Nessuna dipendenza GPU lato container: autoapp disegna su Xvfb,
     # GStreamer (ximagesrc) cattura lo schermo e lo trasmette via TCP in
-    # formato grezzo. Lato Flutter, flutterpi_gstreamer_video_player
-    # (plugin gia' mantenuto) riceve lo stream e gestisce lui la texture.
+    # formato grezzo. NOTA: da quando l'app e' passata a Flutter Linux
+    # desktop standard (niente piu' flutter-pi), il video_player ufficiale
+    # di Google non ha un'implementazione Linux -- va scelto un plugin
+    # video Linux-compatibile (es. media_kit) per ricevere questo stream
+    # lato Flutter, vedi androidauto_texture_view.dart.
 
 volumes:
   mosquitto_data:

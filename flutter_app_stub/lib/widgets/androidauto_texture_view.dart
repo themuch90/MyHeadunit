@@ -1,20 +1,19 @@
 import 'package:flutter/material.dart';
 import 'package:video_player/video_player.dart';
 
-/// Mostra il framebuffer di Android Auto usando il pacchetto UFFICIALE
-/// video_player di Google, senza pacchetti terzi ne' codice nativo custom.
+/// Mostra il framebuffer di Android Auto ricevendolo dal container
+/// androidauto-bridge, che trasmette lo schermo virtuale (Xvfb, dove
+/// autoapp disegna) via GStreamer/TCP su 127.0.0.1:5000, in formato grezzo
+/// (nessuna codifica H.264 -- loopback, comprimere aggiungerebbe solo
+/// latenza).
 ///
-/// Fonte di questa scelta: il README ufficiale di flutter-pi
-/// (github.com/ardera/flutter-pi) dichiara esplicitamente che il supporto
-/// GStreamer e' integrato nel motore stesso (opzione di build
-/// BUILD_GSTREAMER_VIDEO_PLAYER_PLUGIN, vedi setup-host.sh) e che, una
-/// volta ricompilato flutter-pi con quell'opzione, "non c'e' nulla di
-/// specifico da fare lato Dart" -- si usa VideoPlayerController normale.
-///
-/// Il container androidauto-bridge trasmette lo schermo virtuale (Xvfb,
-/// dove autoapp disegna) via GStreamer/TCP su 127.0.0.1:5000, in formato
-/// grezzo (nessuna codifica H.264 -- loopback, comprimere aggiungerebbe
-/// solo latenza).
+/// NOTA (da quando il progetto e' passato a Flutter Linux desktop standard,
+/// senza piu' flutter-pi): il pacchetto ufficiale `video_player` di Google
+/// non ha un'implementazione per Linux (solo Android/iOS/web/macOS), quindi
+/// `VideoPlayerController` qui sotto non funziona finche' non si sceglie un
+/// plugin video Linux-compatibile (es. `media_kit`/`media_kit_video`, che
+/// ha supporto Linux maturo) e si adatta questo widget di conseguenza --
+/// verificato con `flutter analyze` pulito ma NON testato a runtime.
 class AndroidAutoTextureView extends StatefulWidget {
   const AndroidAutoTextureView({super.key});
 
@@ -35,12 +34,10 @@ class _AndroidAutoTextureViewState extends State<AndroidAutoTextureView> {
   Future<void> _init() async {
     try {
       // Pipeline GStreamer che deve combaciare con quella lato container
-      // (androidauto-bridge/launcher.py, _start_gstreamer_stream).
-      // NOTA: se l'implementazione GStreamer di flutter-pi si aspetta la
-      // pipeline con un prefisso URI specifico invece della stringa grezza
-      // (es. "gst-pipeline://...") anziche' come dataSource diretto, e' un
-      // aggiustamento minore qui, non un cambio di architettura -- verifica
-      // contro l'esempio incluso nel repo flutter-pi una volta clonato.
+      // (androidauto-bridge/launcher.py, _start_gstreamer_stream). NOTA:
+      // VideoPlayerController non ha implementazione Linux (vedi commento
+      // in cima al file) -- questa chiamata fallisce finche' non si integra
+      // un plugin video Linux-compatibile al posto di video_player.
       const pipeline = 'tcpclientsrc host=127.0.0.1 port=5000 '
           '! gdpdepay ! rtpvrawdepay ! videoconvert';
 

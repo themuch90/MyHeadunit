@@ -27,20 +27,15 @@ Kind=vcan
 EOF
 echo "vcan0 creata e attiva. Verifica con: ip link show vcan0"
 
-echo "== Cage/flutter-pi: dipendenze (funzionano anche su GPU virtuale/llvmpipe) =="
+echo "== Cage/app Flutter Linux desktop: dipendenze (funzionano anche su GPU virtuale/llvmpipe) =="
 sudo apt-get install -y \
     cage \
-    libgles2-mesa-dev \
-    libegl1-mesa-dev \
-    libdrm-dev \
-    libgbm-dev \
-    libsystemd-dev \
-    libinput-dev \
-    libudev-dev \
-    libxkbcommon-dev \
+    clang \
     cmake \
     ninja-build \
-    clang \
+    pkg-config \
+    libgtk-3-dev \
+    liblzma-dev \
     mesa-utils
 
 echo "== libvncclient per il plugin texture Android Auto =="

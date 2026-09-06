@@ -7,8 +7,10 @@
 │  Host (Linux x86_64)                         │
 │                                               │
 │  ┌─────────────┐   Wayland    ┌────────────┐ │
-│  │ Cage (kiosk)│──────────────│ flutter-pi │ │
-│  └─────────────┘              └─────┬──────┘ │
+│  │ Cage (kiosk)│──────────────│ App Flutter│ │
+│  └─────────────┘              │  (linux,   │ │
+│                                │  standard) │ │
+│                                └─────┬──────┘ │
 │                                      │ WS     │
 │  ┌────────────────────────────────  ▼ ─────┐ │
 │  │ Docker (network_mode: host)             │ │
@@ -20,8 +22,10 @@
       CAN bus veicolo         modulo GPS
 ```
 
-L'interfaccia grafica (flutter-pi) gira **sull'host**, non in Docker: ha bisogno
-di accesso diretto a `/dev/dri` e al compositor Wayland, e containerizzarla non
+L'interfaccia grafica è una normale **app Flutter Linux desktop** (target
+ufficiale `linux`, `flutter build linux`), lanciata fullscreen come unico
+client Wayland sotto Cage: gira **sull'host**, non in Docker, perché ha
+bisogno di accesso diretto al compositor Wayland e containerizzarla non
 porta benefici per un singolo processo dedicato. I servizi headless (MQTT, lettura
 CAN, GPS, API) sono invece in Docker: si aggiornano e si isolano facilmente.
 
@@ -33,8 +37,9 @@ chmod +x setup-host.sh
 sudo reboot
 ```
 
-Questo installa Docker, Cage, le dipendenze di build per flutter-pi e compila
-flutter-pi in `/usr/local/bin`. Per il bus CAN il target principale è un
+Questo installa Docker, Cage e le dipendenze per compilare l'app Flutter
+Linux desktop (`clang`, `cmake`, `ninja-build`, `libgtk-3-dev`...). Per il
+bus CAN il target principale è un
 adattatore USB-CAN (es. PCAN-USB, CANable), che appare come `can0` senza
 bisogno di overlay; lo script include anche, come opzione, l'overlay del
 modulo CAN via SPI (MCP2515 — **adatta al tuo hardware CAN**, es. Waveshare
@@ -59,18 +64,17 @@ docker exec -it mosquitto mosquitto_sub -t 'car/#' -v
 ```bash
 cd flutter_app_stub
 flutter pub get
-flutter build linux --release   # produce l'asset bundle per flutter-pi
+flutter build linux --release
 ```
 
-flutter-pi non usa l'eseguibile Linux desktop generato: usa la cartella
-`build/flutter_assets` insieme al runtime engine. Verifica il percorso esatto
-richiesto dalla versione di flutter-pi che hai compilato (vedi
-https://github.com/ardera/flutter-pi per dettagli aggiornati, il progetto è
-attivamente mantenuto e la sintassi CLI può evolvere).
+Produce un bundle Linux desktop standard e autocontenuto in
+`build/linux/x64/release/bundle/` (l'eseguibile `headunit_app` più le sue
+librerie e `data/`, incluso l'engine Flutter): nessun embedder custom da
+compilare o versionare a parte, l'app si lancia direttamente.
 
 Copia il bundle sul target:
 ```bash
-scp -r build/flutter_assets headunit@<ip-host>:/opt/headunit/app/build/
+scp -r build/linux/x64/release/bundle headunit@<ip-host>:/opt/headunit/app/bundle
 ```
 
 ## 4. Avvio automatico al boot
@@ -192,7 +196,7 @@ docker exec -it mosquitto mosquitto_sub -t 'car/phone/#' -v
 - Il path dell'adattatore Bluetooth (`/org/bluez/hci0`) è hardcoded: se il Pi
   ha più adattatori o un nome diverso, va reso configurabile.
 
-## 6. Android Auto (cablato via USB/AOAP, video via GStreamer integrato in flutter-pi)
+## 6. Android Auto (cablato via USB/AOAP, video via GStreamer)
 
 ### Perché cablato invece che WiFi Direct
 
@@ -207,24 +211,16 @@ quel canale USB. Zero negoziazione wireless.
 **Conseguenza sull'hardware**: non serve una seconda scheda Bluetooth
 dedicata né `wpa_supplicant` in modalità P2P.
 
-### Perché il video player GStreamer integrato invece di codice custom
+### Stato attuale: da adattare al passaggio a Flutter Linux standard
 
-Sono state esplorate due strade più complesse prima di arrivare a questa:
-
-1. Scrivere un plugin nativo che registra una texture GL a mano tramite
-   `texture_registry.h` di flutter-pi — funziona in linea di principio ma
-   introduce codice C custom da mantenere e un punto irrisolto (come un
-   plugin ottiene il puntatore al registry al proprio init).
-2. Un pacchetto pub.dev di terze parti (`flutterpi_gstreamer_video_player`)
-   — scartato perché immaturo (pochi download, nessuna piattaforma
-   dichiarata support nell'analisi automatica di pub.dev).
-
-La via scelta qui è quella **confermata dal README ufficiale di
-[ardera/flutter-pi](https://github.com/ardera/flutter-pi)**: il supporto
-GStreamer è integrato nel motore stesso, si abilita a compile-time con
-un'opzione CMake, e poi — testuale dal README — *"non c'è nulla di
-specifico da fare lato Dart"*: si usa il pacchetto ufficiale `video_player`
-di Google così com'è.
+Questo progetto è passato da un embedder custom (flutter-pi) a una normale
+app **Flutter Linux desktop** (vedi sezione 3). Il pacchetto ufficiale
+`video_player` di Google **non ha un'implementazione per Linux** (solo
+Android/iOS/web/macOS): `androidauto_texture_view.dart` così com'è, basato
+su `VideoPlayerController`, non riceve alcun video finché non si sceglie un
+plugin video Linux-compatibile e si adatta il widget di conseguenza.
+Candidato più maturo: `media_kit` + `media_kit_video` (supporto Linux
+attivamente mantenuto, via libmpv).
 
 ### Architettura
 
@@ -237,8 +233,8 @@ Container androidauto-bridge (nessuna GPU, nessun /dev/dri)
        │   aggiungerebbe solo latenza senza risparmiare banda che qui è
        │   comunque gratis)
 Host: Cage (mono-client)
-  flutter-pi (ricompilato con BUILD_GSTREAMER_VIDEO_PLAYER_PLUGIN=ON)
-    pacchetto ufficiale video_player → VideoPlayerController
+  App Flutter Linux desktop
+    plugin video Linux-compatibile (da scegliere, vedi sopra) → widget texture
 ```
 
 ### Cosa è containerizzato e cosa no
@@ -246,13 +242,13 @@ Host: Cage (mono-client)
 | Resta sull'host | Va in Docker |
 |---|---|
 | **Cage** (compositor) — accesso diretto a DRM/KMS | **`Xvfb` + `autoapp` + pipeline GStreamer di cattura** — nessuna GPU richiesta |
-| **flutter-pi ricompilato** con supporto GStreamer — parte del motore, non un plugin separato | Logica di avvio/stop, wrappata da `launcher.py` |
+| **App Flutter Linux desktop** — riceve lo stream e lo mostra in un widget texture | Logica di avvio/stop, wrappata da `launcher.py` |
 | **regole udev** per i permessi USB del telefono | Rilevamento/gestione del device USB tramite `libusb` dentro aasdk |
 
 ### Setup
 
 ```bash
-./setup-host.sh   # ricompila flutter-pi con GStreamer, installa Cage, regole udev USB
+./setup-host.sh   # installa Cage, le dipendenze di build Flutter, regole udev USB
 
 sudo cp systemd/headunit-ui.service /etc/systemd/system/
 sudo systemctl daemon-reload
@@ -262,10 +258,9 @@ docker compose build androidauto-bridge
 docker compose up -d androidauto-bridge
 ```
 
-Nell'app Flutter la dipendenza è il pacchetto ufficiale `video_player` (già
-in `pubspec.yaml` di questo progetto), nessun pacchetto esotico. Collega il
-telefono via cavo USB, poi avvia la sessione dal dashboard (tile "Android
-Auto" → Avvia).
+Collega il telefono via cavo USB, poi avvia la sessione dal dashboard (tile
+"Android Auto" → Avvia) -- una volta scelto e integrato un plugin video
+Linux-compatibile (vedi sopra).
 
 ### Topic MQTT
 
@@ -277,19 +272,18 @@ Auto" → Avvia).
 
 ### Nell'app Flutter
 
-- `pubspec.yaml` — dipendenza `video_player` (pacchetto ufficiale Google)
+- `pubspec.yaml` — dipendenza `video_player` (pacchetto ufficiale Google,
+  **da sostituire**: nessuna implementazione Linux, vedi sopra)
 - `lib/widgets/androidauto_texture_view.dart` — `VideoPlayerController`
-  puntato alla pipeline GStreamer del container
+  puntato alla pipeline GStreamer del container (**non funzionante** finché
+  non si integra un plugin video Linux-compatibile)
 - `lib/services/androidauto_service.dart` — avvio/stop/stato via MQTT
 
 ### Limiti noti da adattare
 
-- Il modo esatto in cui passare una pipeline GStreamer raw (invece di un
-  URL http/file normale) a `VideoPlayerController` non è stato verificato
-  parola per parola oltre la conferma del README ufficiale; se
-  l'implementazione di flutter-pi si aspetta un prefisso URI specifico
-  invece della stringa diretta, è un aggiustamento minore da fare guardando
-  gli esempi nel repo clonato, non un cambio di architettura.
+- **Video non funzionante**: vedi "Stato attuale" sopra -- serve scegliere
+  e integrare un plugin video con supporto Linux prima di poter verificare
+  il resto della pipeline.
 - La pipeline GStreamer lato container (`rtpvrawpay`/`gdppay`) e quella
   lato client (`rtpvrawdepay`/`gdpdepay`) devono restare in sincrono.
 - Il flag `--usb` di `autoapp` è indicativo: verifica `autoapp --help`

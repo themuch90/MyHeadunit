@@ -16,20 +16,18 @@ sudo usermod -aG docker "$USER"
 echo "== Docker Compose plugin =="
 sudo apt-get install -y docker-compose-plugin
 
-echo "== Dipendenze per Cage (kiosk Wayland) e flutter-pi =="
+echo "== Cage (kiosk Wayland) e dipendenze di build per l'app Flutter Linux desktop =="
+echo "   L'interfaccia gira come normale app Flutter Linux desktop (target"
+echo "   'linux' ufficiale, 'flutter build linux'), lanciata fullscreen come"
+echo "   unico client sotto Cage -- niente piu' embedder custom da compilare."
 sudo apt-get install -y \
     cage \
-    libgles2-mesa-dev \
-    libegl1-mesa-dev \
-    libdrm-dev \
-    libgbm-dev \
-    libsystemd-dev \
-    libinput-dev \
-    libudev-dev \
-    libxkbcommon-dev \
+    clang \
     cmake \
     ninja-build \
-    clang \
+    pkg-config \
+    libgtk-3-dev \
+    liblzma-dev \
     can-utils
 
 echo "== libvncclient: serve per compilare il plugin texture Android Auto =="
@@ -106,24 +104,5 @@ if [ -f /boot/firmware/config.txt ]; then
     echo "Overlay CAN aggiunto. Riavvio necessario."
   fi
 fi
-
-echo "== Build flutter-pi (con supporto GStreamer video player integrato) =="
-echo "   Confermato dal README ufficiale: il supporto GStreamer va abilitato"
-echo "   a compile-time con l'opzione CMake dedicata, poi si usa il"
-echo "   pacchetto ufficiale video_player senza nulla di specifico lato Dart."
-sudo apt-get install -y \
-    libgstreamer1.0-dev libgstreamer-plugins-base1.0-dev \
-    libgstreamer-plugins-bad1.0-dev \
-    gstreamer1.0-plugins-base gstreamer1.0-plugins-good \
-    gstreamer1.0-plugins-ugly gstreamer1.0-plugins-bad \
-    gstreamer1.0-libav gstreamer1.0-alsa \
-    glib-networking   # backend TLS per souphttpsrc: serve alla schermata
-                       # Radio Web per riprodurre stream via https://
-
-git clone --recursive https://github.com/ardera/flutter-pi.git /tmp/flutter-pi
-cd /tmp/flutter-pi
-mkdir -p build && cd build
-cmake -G Ninja -DBUILD_GSTREAMER_VIDEO_PLAYER_PLUGIN=ON ..
-ninja install
 
 echo "== Fatto. Riavvia il sistema prima di procedere: sudo reboot =="
