@@ -4,6 +4,7 @@ import 'package:web_socket_channel/web_socket_channel.dart';
 import 'services/phone_service.dart';
 import 'services/bluetooth_service.dart';
 import 'services/androidauto_service.dart';
+import 'services/radio_service.dart';
 import 'widgets/androidauto_texture_view.dart';
 import 'widgets/call_banner.dart';
 import 'screens/dialpad_screen.dart';
@@ -48,6 +49,10 @@ class _RootScreenState extends State<RootScreen> {
   late final PhoneService _phoneService;
   late final BluetoothService _btService;
   late final AndroidAutoService _aaService;
+  // Mopidy gira sull'host (non in Docker, vedi setup-host.sh) ed espone gia'
+  // una API di rete pronta all'uso: RadioService ci si collega direttamente,
+  // non tramite il WebSocket condiviso/MQTT come gli altri servizi.
+  late final RadioService _radioService;
 
   int _tabIndex = 0;
   final Map<String, String> _canSignals = {};
@@ -60,6 +65,7 @@ class _RootScreenState extends State<RootScreen> {
     _phoneService = PhoneService(_channel.sink, _messages);
     _btService = BluetoothService(_channel.sink, _messages);
     _aaService = AndroidAutoService(_channel.sink, _messages);
+    _radioService = RadioService();
 
     // Stato di chiamata globale: alimenta il banner in cima mostrato sopra
     // qualunque scheda (dashboard, rubrica, bluetooth...), non solo sulla
@@ -99,6 +105,7 @@ class _RootScreenState extends State<RootScreen> {
     _phoneService.dispose();
     _btService.dispose();
     _aaService.dispose();
+    _radioService.dispose();
     _channel.sink.close();
     super.dispose();
   }
@@ -109,7 +116,7 @@ class _RootScreenState extends State<RootScreen> {
       DashboardTab(signals: _canSignals, aaService: _aaService),
       DialpadScreen(phoneService: _phoneService),
       ContactsScreen(phoneService: _phoneService),
-      const RadioScreen(),
+      RadioScreen(radioService: _radioService),
       SettingsScreen(btService: _btService),
     ];
 

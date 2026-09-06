@@ -93,6 +93,48 @@ UNIT
 sudo systemctl daemon-reload
 sudo systemctl enable --now dbus-session-obex.service obex.service
 
+echo "== Mopidy (motore radio web) =="
+echo "   Demone di sistema come bluetoothd/ofonod/obexd sopra, non un"
+echo "   container: ha bisogno di accesso diretto all'hardware audio ALSA,"
+echo "   che un container Docker minimale non riesce a risolvere in modo"
+echo "   affidabile (alsa-lib ha bisogno del database udev dell'host)."
+echo "   L'app Flutter ci si collega direttamente via WebSocket/JSON-RPC su"
+echo "   127.0.0.1:6680, vedi lib/services/radio_service.dart."
+sudo apt-get install -y \
+    mopidy \
+    gstreamer1.0-plugins-good \
+    gstreamer1.0-plugins-ugly \
+    gstreamer1.0-plugins-bad \
+    gstreamer1.0-libav \
+    glib-networking
+
+# Bug reale in mopidy 3.4.2 (mopidy/audio/scan.py) con la versione di
+# PyGObject/GStreamer di Debian trixie: nel ramo "have-type" del type-find,
+# legge il MIME type con get_value("caps").get_name(). Ma li' get_value
+# ritorna uno StructureWrapper -- un oggetto pensato per essere usato SOLO
+# come context manager ("with ... as caps:"), che fuori da un blocco with
+# non espone alcun metodo: ogni accesso diretto fallisce con AttributeError.
+# Senza questa patch, core.tracklist.add fallisce silenziosamente su
+# QUALSIASI stream (ritorna una lista vuota invece del brano aggiunto).
+sudo python3 - <<'PYEOF'
+path = "/usr/lib/python3/dist-packages/mopidy/audio/scan.py"
+old = '                mime = msg.get_structure().get_value("caps").get_name()\n'
+new = (
+    '                with msg.get_structure().get_value("caps") as _caps_struct:\n'
+    '                    mime = _caps_struct.get_name()\n'
+)
+with open(path) as f:
+    content = f.read()
+if new not in content:
+    assert content.count(old) == 1, "riga attesa non trovata: mopidy si e' aggiornato?"
+    content = content.replace(old, new)
+    with open(path, "w") as f:
+        f.write(content)
+PYEOF
+
+sudo cp mopidy/mopidy.conf /etc/mopidy/mopidy.conf
+sudo systemctl enable --now mopidy.service
+
 echo "== Abilita overlay CAN (SOLO Raspberry Pi con HAT SPI, es. MCP2515) =="
 echo "   Su mini PC x86_64 salta questa sezione: usa un adattatore USB-CAN"
 echo "   (es. PCAN-USB, CANable) che appare direttamente come can0 via"

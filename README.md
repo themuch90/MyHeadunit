@@ -293,7 +293,69 @@ Linux-compatibile (vedi sopra).
 - `cap_add: SYS_ADMIN` serve per lo switch AOAP via `libusb`; se vuoi
   restringerlo, valuta `--device-cgroup-rule` sul VID/PID specifico del tuo
   telefono invece del generico `/dev/bus/usb`.
-## 7. Testare tutto in VM prima dell'hardware definitivo
+## 7. Radio web (Mopidy)
+
+La riproduzione degli stream radio via internet si appoggia a
+[Mopidy](https://mopidy.com/), non a un player scritto da zero in Flutter.
+
+### Cosa è containerizzato e cosa no
+
+Mopidy **non è in Docker**: gira come demone di sistema sull'host via
+systemd, esattamente come `bluetoothd`/`ofonod`/`obexd` (vedi sezione 5),
+perché ha bisogno di accesso diretto all'hardware audio ALSA reale. È stato
+effettivamente provato in un container prima di questa scelta: alsa-lib non
+riesce a risolvere **nessun** device ALSA dentro un container minimale,
+nemmeno passato esplicitamente (es. `hw:0,0`) e con `/dev/snd` montato e i
+permessi corretti, perché le sue routine di enumerazione hanno bisogno del
+database udev dell'host, che un container non ha di norma (serve anche
+sbloccare `/proc/asound`, mascherato di default dai profili di sicurezza
+Docker). Sull'host, con systemd/udev veri, funziona senza configurazione
+aggiuntiva.
+
+L'app Flutter (`lib/services/radio_service.dart`) si collega **direttamente**
+all'API WebSocket/JSON-RPC di Mopidy (`ws://127.0.0.1:6680/mopidy/ws`), non
+tramite il WebSocket condiviso/MQTT dell'api-gateway come gli altri servizi:
+Mopidy espone già un'API di rete pensata apposta per questo, quindi un ponte
+intermedio non aggiungerebbe nulla.
+
+### Setup
+
+```bash
+./setup-host.sh   # installa mopidy, applica una patch nota (vedi sotto),
+                   # copia mopidy/mopidy.conf, abilita il servizio
+```
+
+Verifica rapida via HTTP (senza WebSocket):
+```bash
+curl -X POST -H 'Content-Type: application/json' \
+  -d '{"jsonrpc":"2.0","id":1,"method":"core.playback.get_state"}' \
+  http://127.0.0.1:6680/mopidy/rpc
+```
+
+### Bug noto (patchato automaticamente da setup-host.sh)
+
+Mopidy 3.4.2, con la versione di PyGObject/GStreamer di Debian trixie, ha un
+bug reale in `mopidy/audio/scan.py`: nel ramo "have-type" del type-find,
+legge il MIME type con `get_value("caps").get_name()`. Ma `get_value("caps")`
+lì ritorna uno `StructureWrapper` — un oggetto pensato per essere usato solo
+come context manager (`with ... as caps:`) — che fuori da un blocco `with`
+non espone alcun metodo: ogni accesso diretto fallisce con `AttributeError`.
+Senza patch, `core.tracklist.add` fallisce silenziosamente su **qualsiasi**
+stream (ritorna una lista vuota invece del brano aggiunto). `setup-host.sh`
+applica la correzione automaticamente con uno script Python inline; se
+Mopidy viene aggiornato a una versione che la risolve upstream, lo script
+lo rileva (`assert`) e va aggiornato di conseguenza.
+
+### Nell'app Flutter
+
+- `lib/services/radio_service.dart` — client JSON-RPC/WebSocket verso
+  Mopidy: `playUri`, `pause`, `resume`, `stop`, stream di stato
+  (`RadioPlaybackState`) e metadati (`trackName`, `streamTitle`)
+- `lib/screens/radio_screen.dart` — stazioni preimpostate (SomaFM, pubbliche
+  e senza autenticazione) più un campo per aggiungerne di personalizzate
+  via nome/URL
+
+## 8. Testare tutto in VM prima dell'hardware definitivo
 
 Puoi validare l'intero stack software (Docker, MQTT, Flutter, pipeline VNC)
 in una VM, senza hardware reale — vedi `vm-testing/README.md`. Bluetooth e

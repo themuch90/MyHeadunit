@@ -72,16 +72,16 @@ services:
     # bluetoothd/ofonod/obexd devono essere gia' attivi sull'host (systemd),
     # vedi setup-host.sh. Questo container NON li sostituisce.
 
-  mopidy:
-    build: ./mopidy
-    container_name: mopidy
-    restart: unless-stopped
-    network_mode: host   # l'app Flutter (sull'host) si collega direttamente a 127.0.0.1:6680
-    volumes:
-      - /dev/snd:/dev/snd   # uscita audio ALSA reale (l'host non ha PulseAudio/PipeWire)
-      - mopidy_data:/var/lib/mopidy
-    group_add:
-      - audio   # accesso ai device /dev/snd, che appartengono al gruppo "audio" dell'host
+  # Mopidy (motore di riproduzione radio web) NON e' containerizzato: gira
+  # come demone di sistema sull'host via systemd, esattamente come
+  # bluetoothd/ofonod/obexd (vedi phone-bridge sopra), perche' ha bisogno di
+  # accesso diretto all'hardware audio ALSA reale. Provato che il percorso
+  # container e' fragile qui: alsa-lib non riesce a risolvere NESSUN device
+  # ALSA dentro un container minimale anche con /dev/snd montato e i
+  # permessi corretti (le sue routine di enumerazione hanno bisogno del
+  # database udev dell'host, che un container non ha). Setup in
+  # setup-host.sh; l'app Flutter si collega direttamente alla sua API
+  # WebSocket/JSON-RPC su 127.0.0.1:6680, vedi lib/services/radio_service.dart.
 
   androidauto-bridge:
     build: ./androidauto-bridge
@@ -120,4 +120,3 @@ services:
 volumes:
   mosquitto_data:
   mosquitto_log:
-  mopidy_data:

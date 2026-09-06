@@ -1,12 +1,6 @@
 import 'package:flutter/material.dart';
-import 'package:video_player/video_player.dart';
+import '../services/radio_service.dart';
 
-/// Riproduzione diretta via rete, senza passare dal backend Docker: la
-/// pipeline GStreamer integrata in flutter-pi (vedi setup-host.sh,
-/// BUILD_GSTREAMER_VIDEO_PLAYER_PLUGIN) gestisce nativamente anche stream
-/// audio HTTP/Icecast tramite lo stesso VideoPlayerController gia' usato per
-/// il video di Android Auto (vedi androidauto_texture_view.dart) -- qui
-/// semplicemente non si mostra alcun widget video, solo l'audio.
 class RadioStation {
   final String name;
   final String genre;
@@ -46,7 +40,8 @@ const _presetStations = [
 ];
 
 class RadioScreen extends StatefulWidget {
-  const RadioScreen({super.key});
+  final RadioService radioService;
+  const RadioScreen({super.key, required this.radioService});
 
   @override
   State<RadioScreen> createState() => _RadioScreenState();
@@ -57,38 +52,46 @@ class _RadioScreenState extends State<RadioScreen> {
   final _nameController = TextEditingController();
   final _urlController = TextEditingController();
 
-  VideoPlayerController? _controller;
   RadioStation? _current;
+  RadioPlaybackState _playback = RadioPlaybackState.stopped;
   bool _connecting = false;
   String? _error;
+  String? _trackName;
+  String? _streamTitle;
+
+  @override
+  void initState() {
+    super.initState();
+    widget.radioService.state.listen((s) {
+      setState(() {
+        _playback = s;
+        _connecting = false;
+        if (s == RadioPlaybackState.stopped) {
+          _current = null;
+          _trackName = null;
+          _streamTitle = null;
+        }
+      });
+    });
+    widget.radioService.trackName.listen((n) => setState(() => _trackName = n));
+    widget.radioService.streamTitle.listen((t) => setState(() => _streamTitle = t));
+  }
 
   @override
   void dispose() {
-    _controller?.dispose();
     _nameController.dispose();
     _urlController.dispose();
     super.dispose();
   }
 
   Future<void> _play(RadioStation station) async {
-    final old = _controller;
     setState(() {
-      _controller = null;
       _current = station;
       _connecting = true;
       _error = null;
     });
-    await old?.dispose();
-
     try {
-      final controller = VideoPlayerController.networkUrl(Uri.parse(station.url));
-      await controller.initialize();
-      await controller.play();
-      if (!mounted) return;
-      setState(() {
-        _controller = controller;
-        _connecting = false;
-      });
+      await widget.radioService.playUri(station.url);
     } catch (e) {
       if (!mounted) return;
       setState(() {
@@ -98,24 +101,15 @@ class _RadioScreenState extends State<RadioScreen> {
     }
   }
 
-  Future<void> _stop() async {
-    final old = _controller;
-    setState(() {
-      _controller = null;
-      _current = null;
-      _connecting = false;
-      _error = null;
-    });
-    await old?.dispose();
+  void _togglePlayPause() {
+    if (_playback == RadioPlaybackState.playing) {
+      widget.radioService.pause();
+    } else if (_playback == RadioPlaybackState.paused) {
+      widget.radioService.resume();
+    }
   }
 
-  void _togglePlayPause() {
-    final controller = _controller;
-    if (controller == null) return;
-    setState(() {
-      controller.value.isPlaying ? controller.pause() : controller.play();
-    });
-  }
+  void _stop() => widget.radioService.stop();
 
   void _addCustomStation() {
     final name = _nameController.text.trim();
@@ -131,7 +125,6 @@ class _RadioScreenState extends State<RadioScreen> {
   @override
   Widget build(BuildContext context) {
     final stations = [..._presetStations, ..._customStations];
-    final isPlaying = _controller?.value.isPlaying ?? false;
 
     return Column(
       children: [
@@ -141,7 +134,9 @@ class _RadioScreenState extends State<RadioScreen> {
             current: _current,
             connecting: _connecting,
             error: _error,
-            isPlaying: isPlaying,
+            playback: _playback,
+            trackName: _trackName,
+            streamTitle: _streamTitle,
             onTogglePlayPause: _togglePlayPause,
             onStop: _stop,
           ),
@@ -205,7 +200,9 @@ class _NowPlayingCard extends StatelessWidget {
   final RadioStation? current;
   final bool connecting;
   final String? error;
-  final bool isPlaying;
+  final RadioPlaybackState playback;
+  final String? trackName;
+  final String? streamTitle;
   final VoidCallback onTogglePlayPause;
   final VoidCallback onStop;
 
@@ -213,13 +210,22 @@ class _NowPlayingCard extends StatelessWidget {
     required this.current,
     required this.connecting,
     required this.error,
-    required this.isPlaying,
+    required this.playback,
+    required this.trackName,
+    required this.streamTitle,
     required this.onTogglePlayPause,
     required this.onStop,
   });
 
   @override
   Widget build(BuildContext context) {
+    final isPlaying = playback == RadioPlaybackState.playing;
+    final title = trackName ?? current?.name ?? 'Nessuna stazione';
+    final subtitle = error ??
+        (connecting
+            ? 'Connessione...'
+            : (streamTitle ?? current?.genre ?? 'Seleziona una stazione'));
+
     return Card(
       color: Colors.grey[900],
       child: Padding(
@@ -232,12 +238,9 @@ class _NowPlayingCard extends StatelessWidget {
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
+                  Text(title, style: const TextStyle(fontSize: 18, color: Colors.white)),
                   Text(
-                    current?.name ?? 'Nessuna stazione',
-                    style: const TextStyle(fontSize: 18, color: Colors.white),
-                  ),
-                  Text(
-                    error ?? (connecting ? 'Connessione...' : (current?.genre ?? 'Seleziona una stazione')),
+                    subtitle,
                     style: TextStyle(
                       color: error != null ? Colors.redAccent : Colors.grey,
                       fontSize: 12,
