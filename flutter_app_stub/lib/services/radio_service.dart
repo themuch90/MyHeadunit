@@ -38,7 +38,33 @@ class RadioService {
       : _channel =
             WebSocketChannel.connect(Uri.parse('ws://$host:$port/mopidy/ws')) {
     _channel.stream.listen(_onMessage, onError: (_) {}, cancelOnError: false);
+    // Mopidy invia eventi solo sui CAMBI di stato, non lo stato corrente al
+    // momento della connessione: senza questo, una stazione gia' in
+    // riproduzione (avviata prima che questa schermata si aprisse, o
+    // sopravvissuta a un riavvio dell'app) risulterebbe "ferma" finche' non
+    // cambia qualcosa.
+    _syncInitialState();
   }
+
+  Future<void> _syncInitialState() async {
+    try {
+      final state = await _call('core.playback.get_state');
+      _stateController.add(_parseState(state as String?));
+      final track = await _call('core.playback.get_current_track');
+      if (track != null) {
+        _trackNameController.add((track as Map<String, dynamic>)['name'] as String?);
+      }
+    } catch (_) {
+      // Connessione non ancora pronta o Mopidy non raggiungibile: si
+      // aggiornera' comunque al primo evento reale una volta connesso.
+    }
+  }
+
+  static RadioPlaybackState _parseState(String? state) => switch (state) {
+        'playing' => RadioPlaybackState.playing,
+        'paused' => RadioPlaybackState.paused,
+        _ => RadioPlaybackState.stopped,
+      };
 
   void _onMessage(dynamic raw) {
     final Map<String, dynamic> msg;
@@ -61,11 +87,7 @@ class RadioService {
 
     switch (msg['event']) {
       case 'playback_state_changed':
-        _stateController.add(switch (msg['new_state']) {
-          'playing' => RadioPlaybackState.playing,
-          'paused' => RadioPlaybackState.paused,
-          _ => RadioPlaybackState.stopped,
-        });
+        _stateController.add(_parseState(msg['new_state'] as String?));
         break;
       case 'stream_title_changed':
         _streamTitleController.add(msg['title'] as String?);
