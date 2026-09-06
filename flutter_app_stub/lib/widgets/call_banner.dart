@@ -23,9 +23,14 @@ class CallBanner extends StatelessWidget {
   Widget build(BuildContext context) {
     final isActive = call.state == CallState.active;
     final label = isActive ? 'In corso' : 'Chiamata in corso...';
-    final title = call.name.isNotEmpty
+    // L'identificativo del chiamante via HFP spesso porta solo il numero:
+    // si cerca il nome nella rubrica gia' sincronizzata prima di mostrare
+    // il numero grezzo (vedi PhoneService.contactNameFor).
+    final contactName = call.name.isNotEmpty
         ? call.name
-        : (call.number.isNotEmpty ? call.number : 'Numero sconosciuto');
+        : phoneService.contactNameFor(call.number);
+    final title = contactName ??
+        (call.number.isNotEmpty ? call.number : 'Numero sconosciuto');
 
     return Material(
       color: isActive ? Colors.green[800] : Colors.orange[800],

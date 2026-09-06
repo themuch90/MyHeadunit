@@ -84,9 +84,14 @@ class _DialpadScreenState extends State<DialpadScreen> {
       CallState.active => 'In corso',
       CallState.idle => '',
     };
-    final title = _call.name.isNotEmpty
+    final number = _call.number.isNotEmpty ? _call.number : _number;
+    // L'identificativo del chiamante via HFP (oFono) spesso porta solo il
+    // numero, senza nome: si cerca comunque il nome nella rubrica gia'
+    // sincronizzata prima di mostrare il numero grezzo.
+    final contactName = _call.name.isNotEmpty
         ? _call.name
-        : (_call.number.isNotEmpty ? _call.number : _number);
+        : widget.phoneService.contactNameFor(number);
+    final title = contactName ?? (number.isNotEmpty ? number : 'Numero sconosciuto');
 
     return Padding(
       padding: const EdgeInsets.all(24.0),
@@ -96,6 +101,10 @@ class _DialpadScreenState extends State<DialpadScreen> {
           const CircleAvatar(radius: 40, child: Icon(Icons.person, size: 40)),
           const SizedBox(height: 16),
           Text(title, style: const TextStyle(fontSize: 24, color: Colors.white)),
+          if (contactName != null && number.isNotEmpty) ...[
+            const SizedBox(height: 4),
+            Text(number, style: const TextStyle(fontSize: 14, color: Colors.grey)),
+          ],
           const SizedBox(height: 4),
           Text(label, style: const TextStyle(color: Colors.greenAccent)),
           if (_showKeypad)
@@ -151,31 +160,53 @@ class _DialpadScreenState extends State<DialpadScreen> {
           ),
           const SizedBox(height: 16),
           Expanded(
-            child: GridView.count(
-              crossAxisCount: 3,
-              childAspectRatio: 1.4,
-              children: _keys.map((k) => _DialKey(
-                digit: k[0],
-                letters: k[1],
-                onTap: () => _onKeyTap(k[0]),
-              )).toList(),
+            // childAspectRatio calcolato dallo spazio disponibile (invece di
+            // un valore fisso) cosi' le 4 righe di tasti riempiono
+            // esattamente l'area assegnata: con un rapporto fisso, su uno
+            // schermo largo (tipico di un autoradio) le celle diventavano
+            // piu' alte dello spazio disponibile e la griglia richiedeva
+            // uno scroll per vedere le ultime righe (0 e #).
+            child: LayoutBuilder(
+              builder: (context, constraints) {
+                const crossAxisCount = 3;
+                const rowCount = 4;
+                final cellWidth = constraints.maxWidth / crossAxisCount;
+                final cellHeight = constraints.maxHeight / rowCount;
+                return GridView.count(
+                  crossAxisCount: crossAxisCount,
+                  childAspectRatio: cellWidth / cellHeight,
+                  physics: const NeverScrollableScrollPhysics(),
+                  children: _keys.map((k) => _DialKey(
+                    digit: k[0],
+                    letters: k[1],
+                    onTap: () => _onKeyTap(k[0]),
+                  )).toList(),
+                );
+              },
             ),
           ),
-          Row(
-            mainAxisAlignment: MainAxisAlignment.spaceEvenly,
-            children: [
-              const SizedBox(width: 56),
-              FloatingActionButton(
-                backgroundColor: Colors.green,
-                onPressed: _onCall,
-                child: const Icon(Icons.call),
-              ),
-              IconButton(
-                iconSize: 32,
-                onPressed: _onBackspace,
-                icon: const Icon(Icons.backspace_outlined),
-              ),
-            ],
+          const SizedBox(height: 16),
+          Padding(
+            // Spazio esplicito sotto la griglia: senza, i tasti 0/# e i
+            // pulsanti di chiamata/cancella apparivano troppo vicini,
+            // quasi sovrapposti.
+            padding: const EdgeInsets.only(bottom: 16),
+            child: Row(
+              mainAxisAlignment: MainAxisAlignment.spaceEvenly,
+              children: [
+                const SizedBox(width: 56),
+                FloatingActionButton(
+                  backgroundColor: Colors.green,
+                  onPressed: _onCall,
+                  child: const Icon(Icons.call),
+                ),
+                IconButton(
+                  iconSize: 32,
+                  onPressed: _onBackspace,
+                  icon: const Icon(Icons.backspace_outlined),
+                ),
+              ],
+            ),
           ),
         ],
       ),

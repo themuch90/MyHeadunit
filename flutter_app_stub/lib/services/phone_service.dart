@@ -27,6 +27,25 @@ class Contact {
       );
 }
 
+/// Tiene solo le cifre di un numero, per confrontare formati diversi (con o
+/// senza prefisso internazionale, spazi, trattini...) che la rubrica del
+/// telefono e l'identificativo del chiamante via HFP usano quasi sempre in
+/// modo incoerente tra loro.
+String _digitsOnly(String number) => number.replaceAll(RegExp(r'[^0-9]'), '');
+
+/// Confronta due numeri per le ultime cifre in comune, cosi' "3331234567" e
+/// "+393331234567" (stesso numero, con e senza prefisso Italia) risultano
+/// uguali. Sotto le 7 cifre in comune il confronto per suffisso darebbe
+/// troppi falsi positivi, quindi in quel caso richiede l'uguaglianza esatta.
+bool _numbersMatch(String a, String b) {
+  final da = _digitsOnly(a);
+  final db = _digitsOnly(b);
+  if (da.isEmpty || db.isEmpty) return false;
+  final len = da.length < db.length ? da.length : db.length;
+  if (len < 7) return da == db;
+  return da.substring(da.length - len) == db.substring(db.length - len);
+}
+
 /// Wrapper sopra il WebSocket condiviso con il resto dell'app (dashboard, ecc.)
 /// dedicato ai topic "car/phone/*". Riceve il sink per inviare comandi e lo
 /// stream broadcast condiviso (vedi main.dart) per ascoltare i messaggi,
@@ -38,6 +57,7 @@ class PhoneService {
       StreamController<Map<String, String>>.broadcast();
   final _contactsController = StreamController<List<Contact>>.broadcast();
   final _mutedController = StreamController<bool>.broadcast();
+  List<Contact> _contacts = [];
 
   Stream<CallInfo> get callState => _callStateController.stream;
   Stream<Map<String, String>> get incomingCall =>
@@ -77,10 +97,24 @@ class PhoneService {
       });
     } else if (topic == 'car/phone/contacts') {
       final list = jsonDecode(payload) as List;
-      _contactsController.add(
-        list.map((e) => Contact.fromJson(e as Map<String, dynamic>)).toList(),
-      );
+      _contacts =
+          list.map((e) => Contact.fromJson(e as Map<String, dynamic>)).toList();
+      _contactsController.add(_contacts);
     }
+  }
+
+  /// Nome del contatto in rubrica il cui numero corrisponde a [number], se
+  /// presente. L'identificativo del chiamante via HFP (oFono) spesso non
+  /// include il nome (solo il numero): questo permette comunque di mostrare
+  /// il nome durante una chiamata usando la rubrica gia' sincronizzata.
+  String? contactNameFor(String number) {
+    if (number.isEmpty) return null;
+    for (final contact in _contacts) {
+      for (final n in contact.numbers) {
+        if (_numbersMatch(n, number)) return contact.name;
+      }
+    }
+    return null;
   }
 
   void _send(String topic, Map<String, dynamic> payload) {
